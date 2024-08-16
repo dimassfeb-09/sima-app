@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "63987712448",
+    "project_id": "sigma-siaga-bersama",
+    "storage_bucket": "sigma-siaga-bersama.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:63987712448:android:78de202737c3a2ca54c825",
+        "android_client_info": {
+          "package_name": "com.sigma.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyClek2o3clLQDXNaUTnzLGlDO8WzU7PCRk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
