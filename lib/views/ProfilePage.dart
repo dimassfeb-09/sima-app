@@ -5,7 +5,6 @@ import 'package:project/models/User.dart';
 import 'package:project/views/ChangeEmailPage.dart';
 import 'package:project/views/ChangePasswordPage.dart';
 import 'package:project/views/ChangePhonePage.dart';
-
 import '../utils/colors.dart';
 
 class ProfilePage extends StatelessWidget {
@@ -13,11 +12,12 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    User user = User();
+    final User user = User();
+    final RxBool isLoading = false.obs;
 
     return Scaffold(
       body: FutureBuilder<UserDetail>(
-        future: user.getUserInfo(), // Assuming this returns a Future<UserDetail>
+        future: user.getUserInfo(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -35,9 +35,9 @@ class ProfilePage extends StatelessWidget {
                       CircleAvatar(
                         maxRadius: 50,
                         minRadius: 30,
-                        backgroundImage: NetworkImage(userDetail.photoURL), // Or use an asset if needed
+                        backgroundImage: userDetail.photoURL.isNotEmpty ? NetworkImage(userDetail.photoURL) : null,
                         child: userDetail.photoURL.isEmpty
-                            ? Text(userDetail.displayName.isNotEmpty ? userDetail.displayName[0] : "AH")
+                            ? Text(_getInitials(userDetail.displayName), style: const TextStyle(fontSize: 24))
                             : null,
                       ),
                       const SizedBox(height: 12),
@@ -78,9 +78,6 @@ class ProfilePage extends StatelessWidget {
                             icon: Icons.person_2_outlined,
                             label: "Nama",
                             value: userDetail.displayName,
-                            onTap: () {
-                              // Handle "Laporan ke Polisi" tap
-                            },
                             isEditable: false,
                           ),
                           const Divider(thickness: 0.3),
@@ -88,9 +85,6 @@ class ProfilePage extends StatelessWidget {
                             icon: Icons.numbers,
                             label: "NIK",
                             value: userDetail.nik ?? 'gak ada',
-                            onTap: () {
-                              // Handle "Laporan ke Polisi" tap
-                            },
                             isEditable: userDetail.nik == '',
                           ),
                           const Divider(thickness: 0.3),
@@ -102,7 +96,6 @@ class ProfilePage extends StatelessWidget {
                               if (userDetail.isSignInWithGoogle) {
                                 return ToastUtils.showSuccess("Login menggunakan Google tidak dapat mengubah email.");
                               }
-
                               Get.to(() => const ChangeEmailPage());
                             },
                           ),
@@ -145,7 +138,6 @@ class ProfilePage extends StatelessWidget {
                           if (userDetail.isSignInWithGoogle) {
                             return ToastUtils.showSuccess("Login menggunakan Google tidak dapat mengubah kata sandi.");
                           }
-
                           Get.to(() => const ChangePasswordPage());
                         },
                       ),
@@ -154,19 +146,36 @@ class ProfilePage extends StatelessWidget {
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                  child: TextButton(
-                    onPressed: user.signOutAccount,
-                    style: TextButton.styleFrom(
-                      backgroundColor: redAccent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(5),
-                        side: BorderSide(color: Colors.grey.shade400),
+                  child: Obx(
+                    () => TextButton(
+                      onPressed: isLoading.value
+                          ? null
+                          : () async {
+                              isLoading.value = true;
+                              try {
+                                await user.signOutAccount();
+                                ToastUtils.showSuccess("Berhasil keluar");
+                                Get.offAllNamed('/login'); // Redirect to login page after logout
+                              } catch (e) {
+                                ToastUtils.showError('Gagal keluar: $e');
+                              } finally {
+                                isLoading.value = false;
+                              }
+                            },
+                      style: TextButton.styleFrom(
+                        backgroundColor: isLoading.value ? grayAccent : redAccent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(5),
+                          side: BorderSide(color: Colors.grey.shade400),
+                        ),
+                        minimumSize: const Size(double.infinity, 48),
                       ),
-                      minimumSize: const Size(double.infinity, 48),
-                    ),
-                    child: const Text(
-                      "Keluar",
-                      style: TextStyle(color: Colors.white),
+                      child: isLoading.value
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              "Keluar",
+                              style: TextStyle(color: Colors.white),
+                            ),
                     ),
                   ),
                 ),
@@ -184,7 +193,7 @@ class ProfilePage extends StatelessWidget {
     required IconData icon,
     String? label,
     String? value,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
     bool isEditable = true,
   }) {
     return Row(
@@ -224,5 +233,18 @@ class ProfilePage extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _getInitials(String name) {
+    List<String> parts = name.split(' ');
+
+    if (parts.length == 1) {
+      return parts[0][0].toUpperCase();
+    } else if (parts.length >= 2) {
+      String firstInitial = parts[0][0].toUpperCase();
+      String lastInitial = parts[parts.length - 1][0].toUpperCase();
+      return '$firstInitial$lastInitial';
+    }
+    return '';
   }
 }

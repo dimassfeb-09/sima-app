@@ -8,78 +8,108 @@ import 'package:project/services/user_location.dart';
 
 class HereMapCustom extends StatelessWidget {
   final Rx<GeoCoordinates> geoCoordinates;
-  RxBool isLoading = true.obs;
-  RxString streetName = ''.obs;
-  RxBool isConfirmed = false.obs;
+  final RxBool isLoading = true.obs;
+  final RxString streetName;
+  final RxBool isConfirmed = false.obs;
+  final bool editableStreet;
+
+  final TextEditingController streetNameController = TextEditingController();
 
   HereMapCustom({
     Key? key,
     required this.geoCoordinates,
     required this.streetName,
+    this.editableStreet = true,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        SizedBox(
-          height: 300,
-          child: Obx(() {
-            return Container(
-              height: 300,
-              child: Stack(
-                children: [
-                  HereMap(
-                    onMapCreated: _onMapCreated,
-                  ),
-                  isLoading.value ? const Center(child: CircularProgressIndicator()) : const SizedBox.shrink()
-                ],
-              ),
-            );
-          }),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 12),
-          color: Colors.white,
-          width: double.infinity,
-          child: Row(
-            children: [
-              const SizedBox(width: 14),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Lokasi Kejadian",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Obx(
-                    () => geoCoordinates.value.latitude == 0.0 || geoCoordinates.value.longitude == 0.0
-                        ? const Text("Loading...")
-                        : Text(
-                            "${geoCoordinates.value.latitude}, ${geoCoordinates.value.longitude}",
-                            style: TextStyle(color: Colors.grey.shade500),
-                          ),
-                  ),
-                  const SizedBox(height: 6),
-                  Obx(
-                    () => Text(
-                      streetName.value.isEmpty ? "Loading..." : streetName.value,
-                      style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 2,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+    ever(streetName, (String value) {
+      streetNameController.text = value;
+    });
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(width: 0.3),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 250,
+            child: Stack(
+              children: [
+                HereMap(
+                  onMapCreated: _onMapCreated,
+                ),
+                if (isLoading.value) const Center(child: CircularProgressIndicator()),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 20),
-      ],
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(bottomLeft: Radius.circular(5), bottomRight: Radius.circular(5)),
+            ),
+            width: double.infinity,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Lokasi Kejadian",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Obx(
+                  () => geoCoordinates.value.latitude == 0.0 || geoCoordinates.value.longitude == 0.0
+                      ? const Text("Sedang mengambil titik koordinat..")
+                      : Text(
+                          "${geoCoordinates.value.latitude}, ${geoCoordinates.value.longitude}",
+                          style: TextStyle(color: Colors.grey.shade500),
+                        ),
+                ),
+                const SizedBox(height: 10),
+                editableStreet
+                    ? Obx(
+                        () => Stack(
+                          children: [
+                            TextField(
+                              controller: streetNameController,
+                              enabled: isConfirmed.value,
+                              decoration: InputDecoration(
+                                contentPadding: const EdgeInsets.only(right: 50, left: 10),
+                                border: const OutlineInputBorder(),
+                                hintText: streetName.value.isEmpty ? 'Sedang mengambil alamat..' : '',
+                              ),
+                            ),
+                            Align(
+                              alignment: AlignmentDirectional.centerEnd,
+                              child: IconButton(
+                                icon: Icon(
+                                  isConfirmed.value ? Icons.cancel : Icons.edit,
+                                ),
+                                onPressed: () {
+                                  isConfirmed.value = !isConfirmed.value;
+                                  if (isConfirmed.value) {
+                                    streetNameController.text = streetName.value;
+                                  }
+                                },
+                              ),
+                            )
+                          ],
+                        ),
+                      )
+                    : Text(streetName.value),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -126,7 +156,7 @@ class HereMapCustom extends StatelessWidget {
       List<Placemark> placemarks = await placemarkFromCoordinates(coordinates.latitude, coordinates.longitude);
 
       streetName.value =
-          "${placemarks.first.street}, ${placemarks.first.subLocality}\n${placemarks.first.locality}, ${placemarks.first.postalCode}.";
+          "${placemarks.first.street}, ${placemarks.first.subLocality}, ${placemarks.first.locality}, ${placemarks.first.postalCode}.";
     } catch (e) {
       debugPrint('Failed to reverse geocode: $e');
       streetName.value = "Error fetching address";
@@ -135,7 +165,7 @@ class HereMapCustom extends StatelessWidget {
 
   Future<void> _centerMapOnCurrentLocation(HereMapController hereMapController, GeoCoordinates geoCoordinates) async {
     try {
-      MapMeasure mapMeasure = MapMeasure(MapMeasureKind.distance, 1000);
+      MapMeasure mapMeasure = MapMeasure(MapMeasureKind.distance, 700);
       hereMapController.camera.lookAtPointWithMeasure(geoCoordinates, mapMeasure);
     } catch (e) {
       debugPrint('Failed to get current location: $e');

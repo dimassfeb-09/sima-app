@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:get/get_state_manager/get_state_manager.dart';
 import 'package:get/route_manager.dart';
 import 'package:project/models/Auth.dart';
 import 'package:project/utils/colors.dart';
 import 'package:project/views/MainPage.dart';
 
-import '../components/Toast.dart'; // Import the ToastUtils class
+import '../components/Toast.dart';
+import '../controller/RegisterController.dart';
 
 class RegisterPage extends StatelessWidget {
   const RegisterPage({super.key});
@@ -13,6 +15,7 @@ class RegisterPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Auth auth = Auth();
+    RegisterController registerController = RegisterController();
     final TextEditingController nameController = TextEditingController();
     final TextEditingController nikController = TextEditingController();
     final TextEditingController emailController = TextEditingController();
@@ -33,6 +36,8 @@ class RegisterPage extends StatelessWidget {
       if (!validateRequiredTextField()) {
         return;
       }
+
+      registerController.setLoading(true);
 
       try {
         final name = nameController.text;
@@ -55,10 +60,14 @@ class RegisterPage extends StatelessWidget {
         return ToastUtils.showError(authResult.errorMessage ?? 'An unknown error occurred.');
       } catch (e) {
         ToastUtils.showError('Unexpected error: $e');
+      } finally {
+        registerController.setLoading(false);
       }
     }
 
     void handleRegisterWithGoogle() async {
+      registerController.setLoading(true);
+
       try {
         AuthResult authResult = await auth.signUpWithGoogle();
         if (authResult.isSuccess) {
@@ -69,6 +78,8 @@ class RegisterPage extends StatelessWidget {
         return ToastUtils.showError(authResult.errorMessage ?? 'An unknown error occurred.');
       } catch (e) {
         ToastUtils.showError('Unexpected error: $e');
+      } finally {
+        registerController.setLoading(false);
       }
     }
 
@@ -157,20 +168,28 @@ class RegisterPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: handleRegisterWithEmail,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: blueAccent,
-              minimumSize: const Size(double.infinity, 48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
+          Obx(() {
+            return TextButton(
+              onPressed: registerController.isLoading.value ? null : handleRegisterWithEmail,
+              style: TextButton.styleFrom(
+                backgroundColor: registerController.isLoading.value ? Colors.grey : blueAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                minimumSize: const Size(double.infinity, 48),
               ),
-            ),
-            child: const Text(
-              "Daftar",
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
+              child: registerController.isLoading.value
+                  ? const SizedBox(
+                      width: 16.0,
+                      height: 16.0,
+                      child: CircularProgressIndicator(),
+                    )
+                  : const Text(
+                      "Daftar",
+                      style: TextStyle(color: Colors.white),
+                    ),
+            );
+          }),
           const SizedBox(height: 20),
           Row(
             children: [
@@ -195,27 +214,35 @@ class RegisterPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          TextButton(
-            onPressed: handleRegisterWithGoogle,
-            style: TextButton.styleFrom(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
-                side: BorderSide(color: Colors.grey.shade400), // Border color
-              ),
-              minimumSize: const Size(double.infinity, 48),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center, // Center align the content
-              children: [
-                SvgPicture.asset("assets/icon/google.svg"),
-                const SizedBox(width: 8), // Spacing between icon and text
-                const Text(
-                  "Daftar dengan Google",
-                  style: TextStyle(color: Colors.black),
+          Obx(() {
+            return TextButton(
+              onPressed: registerController.isLoading.value ? null : handleRegisterWithGoogle,
+              style: TextButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5),
+                  side: BorderSide(color: Colors.grey.shade400),
                 ),
-              ],
-            ),
-          ),
+                minimumSize: const Size(double.infinity, 48),
+              ),
+              child: registerController.isLoading.value
+                  ? const SizedBox(
+                      width: 16.0,
+                      height: 16.0,
+                      child: CircularProgressIndicator(),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SvgPicture.asset("assets/icon/google.svg"),
+                        const SizedBox(width: 8),
+                        const Text(
+                          "Daftar dengan Google",
+                          style: TextStyle(color: Colors.black),
+                        ),
+                      ],
+                    ),
+            );
+          }),
         ],
       ),
     );

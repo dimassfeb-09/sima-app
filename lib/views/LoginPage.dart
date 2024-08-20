@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
 import 'package:project/utils/colors.dart';
+import 'package:project/views/ForgotPasswordPage.dart';
 import 'package:project/views/RegisterPage.dart';
 import '../components/Toast.dart';
+import '../controller/LoginController.dart';
 import '../models/Auth.dart';
 import 'MainPage.dart';
 
@@ -12,6 +14,7 @@ class LoginPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    LoginController loginController = LoginController();
     Auth auth = Auth();
     TextEditingController emailController = TextEditingController();
     TextEditingController passwordController = TextEditingController();
@@ -28,6 +31,8 @@ class LoginPage extends StatelessWidget {
       if (!validateRequiredTextField()) {
         return;
       }
+
+      loginController.setLoading(true);
 
       try {
         final email = emailController.value.text;
@@ -46,10 +51,14 @@ class LoginPage extends StatelessWidget {
         }
       } catch (e) {
         ToastUtils.showError('Unexpected error: $e');
+      } finally {
+        loginController.setLoading(false);
       }
     }
 
     void handleLoginWithGoogle() async {
+      loginController.setLoading(true);
+
       try {
         AuthResult authResult = await auth.signInWithGoogle();
         if (authResult.isSuccess) {
@@ -60,6 +69,8 @@ class LoginPage extends StatelessWidget {
         return ToastUtils.showError(authResult.errorMessage ?? 'An unknown error occurred.');
       } catch (e) {
         ToastUtils.showError('Unexpected error: $e');
+      } finally {
+        loginController.setLoading(false);
       }
     }
 
@@ -125,7 +136,7 @@ class LoginPage extends StatelessWidget {
             margin: const EdgeInsets.only(top: 8, bottom: 20),
             child: GestureDetector(
               onTap: () {
-                Get.to(() => const RegisterPage());
+                Get.to(() => const ForgotPasswordPage());
               },
               child: const Text(
                 "Lupa Kata Sandi?",
@@ -136,20 +147,28 @@ class LoginPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          TextButton(
-            onPressed: handleLoginButton,
-            style: TextButton.styleFrom(
-              backgroundColor: blueAccent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
+          Obx(() {
+            return TextButton(
+              onPressed: loginController.isLoading.value ? null : handleLoginButton,
+              style: TextButton.styleFrom(
+                backgroundColor: loginController.isLoading.value ? Colors.grey : blueAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                minimumSize: const Size(double.infinity, 48),
               ),
-              minimumSize: const Size(double.infinity, 48),
-            ),
-            child: const Text(
-              "Masuk",
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
+              child: loginController.isLoading.value
+                  ? const SizedBox(
+                      width: 16.0,
+                      height: 16.0,
+                      child: CircularProgressIndicator(),
+                    )
+                  : const Text(
+                      "Masuk",
+                      style: TextStyle(color: Colors.white),
+                    ),
+            );
+          }),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -174,27 +193,35 @@ class LoginPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          TextButton(
-            onPressed: handleLoginWithGoogle,
-            style: TextButton.styleFrom(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
-                side: BorderSide(color: Colors.grey.shade400),
-              ),
-              minimumSize: const Size(double.infinity, 48),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SvgPicture.asset("assets/icon/google.svg"),
-                const SizedBox(width: 8),
-                const Text(
-                  "Masuk dengan Google",
-                  style: TextStyle(color: Colors.black),
+          Obx(() {
+            return TextButton(
+              onPressed: loginController.isLoading.value ? null : handleLoginWithGoogle,
+              style: TextButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5),
+                  side: BorderSide(color: Colors.grey.shade400),
                 ),
-              ],
-            ),
-          ),
+                minimumSize: const Size(double.infinity, 48),
+              ),
+              child: loginController.isLoading.value
+                  ? const SizedBox(
+                      width: 16.0,
+                      height: 16.0,
+                      child: CircularProgressIndicator(),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SvgPicture.asset("assets/icon/google.svg"),
+                        const SizedBox(width: 8),
+                        const Text(
+                          "Masuk dengan Google",
+                          style: TextStyle(color: Colors.black),
+                        ),
+                      ],
+                    ),
+            );
+          }),
           const SizedBox(height: 16),
           TextButton(
             onPressed: () {

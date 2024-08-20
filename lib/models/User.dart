@@ -5,6 +5,7 @@ import 'package:get/route_manager.dart';
 import 'package:project/components/Toast.dart';
 import 'package:project/models/Auth.dart';
 import 'package:project/views/LoginPage.dart';
+import 'package:project/views/PasswordResetSuccessPage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UserDetail {
@@ -122,6 +123,18 @@ class User {
       }
     } catch (e) {
       ToastUtils.showError('Unexpected error: $e');
+    }
+  }
+
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      final f_auth.FirebaseAuth auth = f_auth.FirebaseAuth.instance;
+
+      await auth.sendPasswordResetEmail(email: email);
+      Get.to(() => const PasswordResetSuccessPage());
+      ToastUtils.showSuccess("Password reset email sent. Please check your inbox.");
+    } catch (e) {
+      ToastUtils.showError('Error sending password reset email: $e');
     }
   }
 

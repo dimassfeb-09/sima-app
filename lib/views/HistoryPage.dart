@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:here_sdk/core.dart';
 import 'package:project/components/CardItemReport.dart';
 import 'package:project/models/HistoryReportModel.dart';
+import 'package:project/models/ReportModel.dart';
 import 'package:project/utils/colors.dart';
 
 class HistoryPage extends StatelessWidget {
@@ -108,18 +110,18 @@ class HistoryPage extends StatelessWidget {
                         itemCount: reports.length,
                         itemBuilder: (context, index) {
                           final report = reports[index];
-                          print(report.createdAt);
-                          DateTime parsedDate = DateTime.parse(report.createdAt);
-                          String formattedDate =
-                              "${parsedDate.toLocal().toIso8601String().split('T')[0]} ${parsedDate.toLocal().hour.toString().padLeft(2, '0')}:${parsedDate.toLocal().minute.toString().padLeft(2, '0')}";
-
                           return Container(
                             margin: const EdgeInsets.only(bottom: 14),
                             child: CardItemReport(
-                              title: report.title,
-                              createdAt: formattedDate, // Adjust this if you have actual timestamps
-                              location: report.address, // Adjust this if you have actual location
-                              status: report.status ?? "Pending",
+                              reportModel: ReportModel(
+                                title: report.title,
+                                description: report.description,
+                                coordinates: GeoCoordinates(report.latitude, report.longitude),
+                                createdAt: report.createdAt,
+                                location: report.address,
+                                status: report.status ?? "Pending",
+                                imageUrl: report.imageUrl ?? '',
+                              ),
                             ),
                           );
                         },

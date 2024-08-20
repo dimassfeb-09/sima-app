@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:project/utils/colors.dart';
 
+import '../models/Auth.dart';
 import 'HistoryPage.dart';
 import 'HomePage.dart';
 import 'ProfilePage.dart';

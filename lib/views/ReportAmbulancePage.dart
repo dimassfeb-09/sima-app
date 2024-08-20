@@ -2,10 +2,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:here_sdk/core.dart';
+import 'package:project/services/upload_image.dart';
 import 'package:project/utils/colors.dart';
 
 import '../components/HereMap.dart';
 import '../components/Toast.dart';
+import '../components/UploadPhotoCard.dart';
 import '../models/ReportAmbulanceModel.dart';
 import '../models/User.dart' as usr;
 
@@ -16,34 +18,59 @@ class ReportAmbulancePage extends StatelessWidget {
   Widget build(BuildContext context) {
     TextEditingController incidentController = TextEditingController();
     TextEditingController descriptionController = TextEditingController();
+
+    UploadImage uploadImage = UploadImage();
+
     Rx<GeoCoordinates> coordinates = GeoCoordinates(0, 0).obs;
     RxString streetName = ''.obs;
+    RxString imagePathSelected = ''.obs;
+    final RxBool isSuccessSendReport = false.obs;
+    final RxBool isLoadingUploadImage = false.obs;
 
-    bool validareRequiredFields() {
+    bool validateRequiredFields() {
       if (incidentController.text.isEmpty) {
-        ToastUtils.showSuccess('Jenis insiden tidak boleh kosong');
-        return true;
+        ToastUtils.showError('Jenis insiden tidak boleh kosong');
+        return false;
       }
 
       if (descriptionController.text.isEmpty) {
-        ToastUtils.showSuccess('Deskripsi insiden tidak boleh kosong');
-        return true;
+        ToastUtils.showError('Deskripsi insiden tidak boleh kosong');
+        return false;
+      }
+
+      if (imagePathSelected.value.isEmpty) {
+        ToastUtils.showError('Ambil foto terlebih dahulu');
+        return false;
       }
 
       if (coordinates.value.latitude == 0 && coordinates.value.longitude == 0) {
-        ToastUtils.showSuccess('Mohon tunggu, sedang mengambil lokasi anda');
-        return true;
+        ToastUtils.showError('Mohon tunggu, sedang mengambil lokasi anda');
+        return false;
       }
 
       if (streetName.isEmpty) {
-        ToastUtils.showSuccess('Tunggu, sedang mengambil alamat');
-        return true;
+        ToastUtils.showError('Tunggu, sedang mengambil alamat');
+        return false;
       }
 
-      return false;
+      return true;
+    }
+
+    Future<UploadPhotosResponse?> uploadImageHandler() async {
+      isLoadingUploadImage.value = true;
+      try {
+        return await uploadImage.postUploadPhotos(imagePathSelected.value);
+      } catch (e) {
+        ToastUtils.showError('Gagal mengunggah gambar: $e');
+        return null;
+      } finally {
+        isLoadingUploadImage.value = false;
+      }
     }
 
     Future<void> reportAmbulance() async {
+      if (!validateRequiredFields()) return;
+
       try {
         final FirebaseAuth firebaseAuth = FirebaseAuth.instance;
         final usr.User user = usr.User();
@@ -54,25 +81,34 @@ class ReportAmbulancePage extends StatelessWidget {
 
         final int? userId = await user.getUserIdByUID(firebaseAuth.currentUser!.uid);
         if (userId == null) {
-          return ToastUtils.showError('User ID tidak ditemukan');
+          ToastUtils.showError('User ID tidak ditemukan');
+          return;
         }
 
-        bool isFieldBlank = validareRequiredFields();
-        if (isFieldBlank) return;
+        final postUploadPhoto = await uploadImageHandler();
 
-        final ReportAmbulanceModel report = ReportAmbulanceModel(
-          title: incidentController.text,
-          description: descriptionController.text,
-          latitude: coordinates.value.latitude,
-          longitude: coordinates.value.longitude,
-          userId: userId,
-          address: streetName.value,
-        );
+        if (postUploadPhoto != null && postUploadPhoto.status) {
+          final ReportAmbulanceModel report = ReportAmbulanceModel(
+            title: incidentController.text,
+            description: descriptionController.text,
+            latitude: coordinates.value.latitude,
+            longitude: coordinates.value.longitude,
+            userId: userId,
+            status: 'pending',
+            address: streetName.value,
+            imageUrl: postUploadPhoto.imageUrl,
+          );
 
-        await report.insertReport();
-        ToastUtils.showSuccess('Laporan ke ambulans berhasil dikirim');
-        return Get.back();
+          await report.insertReport();
+          isSuccessSendReport.value = true;
+          ToastUtils.showSuccess('Laporan ke ambulans berhasil dikirim');
+          Get.back();
+        } else {
+          isSuccessSendReport.value = false;
+          ToastUtils.showError('Gagal mengirim laporan, coba lagi');
+        }
       } catch (e) {
+        isSuccessSendReport.value = false;
         ToastUtils.showError('Gagal mengirim laporan: $e');
       }
     }
@@ -81,7 +117,7 @@ class ReportAmbulancePage extends StatelessWidget {
       appBar: AppBar(
         title: const Text(
           "Lapor Ambulans",
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
@@ -105,7 +141,7 @@ class ReportAmbulancePage extends StatelessWidget {
                   contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
                   border: OutlineInputBorder(),
                 ),
-                keyboardType: TextInputType.emailAddress,
+                keyboardType: TextInputType.text,
               ),
             ],
           ),
@@ -126,9 +162,35 @@ class ReportAmbulancePage extends StatelessWidget {
                   contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
                   border: OutlineInputBorder(),
                 ),
-                keyboardType: TextInputType.emailAddress,
+                keyboardType: TextInputType.text,
               )
             ],
+          ),
+          const SizedBox(height: 16),
+          UploadPhotoCard(
+            onImageSelected: (imagePath) {
+              imagePathSelected.value = imagePath;
+            },
+          ),
+          Obx(
+            () => Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: imagePathSelected.value.isEmpty ? redAccent : Colors.green.shade400,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(5),
+                  bottomRight: Radius.circular(5),
+                ),
+              ),
+              margin: const EdgeInsets.symmetric(horizontal: 15),
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Center(
+                child: Text(
+                  imagePathSelected.value.isEmpty ? 'Ambil gambar terlebih dahulu.' : 'Berhasil ambil gambar.',
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            ),
           ),
           const SizedBox(height: 16),
           HereMapCustom(
@@ -136,18 +198,24 @@ class ReportAmbulancePage extends StatelessWidget {
             streetName: streetName,
           ),
           const SizedBox(height: 16),
-          TextButton(
-            onPressed: reportAmbulance,
-            style: TextButton.styleFrom(
-              backgroundColor: blueAccent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
+          Obx(
+            () => TextButton(
+              onPressed: !isLoadingUploadImage.value ? reportAmbulance : null,
+              style: TextButton.styleFrom(
+                backgroundColor: isLoadingUploadImage.value ? grayAccent : blueAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                minimumSize: const Size(double.infinity, 48),
               ),
-              minimumSize: const Size(double.infinity, 48),
-            ),
-            child: const Text(
-              "Kirim Laporan Ambulans Sekarang",
-              style: TextStyle(color: Colors.white),
+              child: Text(
+                isLoadingUploadImage.value
+                    ? "Sedang upload gambar"
+                    : isSuccessSendReport.value
+                        ? 'Berhasil Kirim!'
+                        : "Kirim Laporan Ambulans Sekarang",
+                style: TextStyle(color: isLoadingUploadImage.value ? Colors.black : Colors.white),
+              ),
             ),
           ),
           const SizedBox(height: 14),

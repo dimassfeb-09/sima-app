@@ -1,6 +1,8 @@
 import 'package:project/components/Toast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../helpers/format_report_date.dart';
+
 class ReportFireFighterModel {
   final String title;
   final String description;
@@ -43,16 +45,16 @@ class ReportFireFighterModel {
 
   factory ReportFireFighterModel.fromMap(Map<String, dynamic> map) {
     return ReportFireFighterModel(
-      title: map['title'],
-      description: map['description'],
-      status: map['status'],
-      latitude: map['latitude'],
-      longitude: map['longitude'],
-      userId: map['user_id'],
+      title: map['title'] ?? '',
+      description: map['description'] ?? '',
+      status: map['status'] ?? 'Tidak diketahui',
+      latitude: map['latitude'] ?? '',
+      longitude: map['longitude'] ?? '',
+      userId: map['user_id'] ?? '',
       nearby: List<String>.from(map['nearby'] ?? []),
-      address: map['address'],
-      imageUrl: map['image_url'],
-      createdAt: map["created_at"] ?? '',
+      address: map['address'] ?? 'Alamat tidak diketahui',
+      imageUrl: map['image_url'] ?? '',
+      createdAt: formatReportDate(map['created_at']),
     );
   }
 
@@ -60,7 +62,6 @@ class ReportFireFighterModel {
     return list.map((map) => ReportFireFighterModel.fromMap(map)).toList();
   }
 
-  /// Inserts the current report into the Supabase database.
   Future<void> insertReport() async {
     final supabase = Supabase.instance.client;
     try {

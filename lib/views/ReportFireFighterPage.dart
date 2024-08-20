@@ -1,16 +1,14 @@
-import 'dart:io';
-
-import 'package:dio/dio.dart' as dio;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:here_sdk/core.dart';
-import 'package:project/components/CameraPermissionButton.dart';
 import 'package:project/components/Toast.dart';
 import 'package:project/models/ReportFireFighterModel.dart';
 import 'package:project/utils/colors.dart';
+import '../components/UploadPhotoCard.dart';
 import '../models/User.dart' as usr;
 import '../components/HereMap.dart';
+import '../services/upload_image.dart';
 
 class ReportFireFighter extends StatelessWidget {
   const ReportFireFighter({super.key});
@@ -19,77 +17,66 @@ class ReportFireFighter extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextEditingController incidentController = TextEditingController();
     final TextEditingController descriptionController = TextEditingController();
+
+    final UploadImage uploadImage = UploadImage();
+
     final Rx<GeoCoordinates> coordinates = GeoCoordinates(0, 0).obs;
-    final RxString imagePathTakePicture = "".obs;
     final RxString streetName = "".obs;
+    final RxString imagePathSelected = "".obs;
     final RxBool isDetectionFire = false.obs;
     final RxBool isLoadingUploadImage = false.obs;
+    final RxBool isSuccessSendReport = false.obs;
 
-    Future<void> validateImageFireDetector(String imagePath) async {
-      const String url = 'https://fire-detection.fly.dev/predict';
+    bool validateRequiredFields() {
+      if (incidentController.text.isEmpty) {
+        ToastUtils.showError('Jenis insiden tidak boleh kosong');
+        return false;
+      }
 
+      if (descriptionController.text.isEmpty) {
+        ToastUtils.showError('Deskripsi insiden tidak boleh kosong');
+        return false;
+      }
+
+      if (imagePathSelected.value.isEmpty) {
+        ToastUtils.showError('Ambil foto terlebih dahulu');
+        return false;
+      }
+
+      if (coordinates.value.latitude == 0 && coordinates.value.longitude == 0) {
+        ToastUtils.showError('Mohon tunggu, sedang mengambil lokasi anda');
+        return false;
+      }
+
+      if (streetName.isEmpty) {
+        ToastUtils.showError('Tunggu, sedang mengambil alamat');
+        return false;
+      }
+
+      return true;
+    }
+
+    Future<void> handlePredictFirePhoto(String imagePath) async {
+      isLoadingUploadImage.value = true;
       try {
-        isLoadingUploadImage.value = true;
+        final postPredictFire = await uploadImage.postPredictFire(imagePath);
 
-        final dio.Dio dioInstance = dio.Dio();
-        final dio.FormData formData = dio.FormData.fromMap({
-          'file': await dio.MultipartFile.fromFile(imagePath, filename: 'photo.jpg'),
-        });
-
-        final dio.Response response = await dioInstance.post(
-          url,
-          data: formData,
-          options: dio.Options(headers: {'Content-Type': 'multipart/form-data'}),
-        );
-
-        if (response.statusCode == 200) {
-          isDetectionFire.value = response.data["probability"] > 0.8;
+        if (postPredictFire != null && postPredictFire.probability > 0.8) {
+          isDetectionFire.value = true;
         } else {
-          print('Unexpected response status: ${response.statusCode}');
+          isDetectionFire.value = false;
         }
       } catch (e) {
-        print('Error occurred: $e');
+        ToastUtils.showError('Gagal upload gambar: $e');
       } finally {
         isLoadingUploadImage.value = false;
       }
     }
 
-    bool validareRequiredFields() {
-      if (incidentController.text.isEmpty) {
-        ToastUtils.showSuccess('Jenis insiden tidak boleh kosong');
-        return true;
-      }
-
-      if (descriptionController.text.isEmpty) {
-        ToastUtils.showSuccess('Deskripsi insiden tidak boleh kosong');
-        return true;
-      }
-
-      if (coordinates.value.latitude == 0 && coordinates.value.longitude == 0) {
-        ToastUtils.showSuccess('Mohon tunggu, sedang mengambil lokasi anda');
-        return true;
-      }
-
-      if (imagePathTakePicture.value.isEmpty) {
-        ToastUtils.showSuccess('Foto bukti tidak boleh kosong');
-        return true;
-      }
-
-      if (streetName.isEmpty) {
-        ToastUtils.showSuccess('Tunggu, sedang mengambil alamat');
-        return true;
-      }
-
-      return false;
-    }
-
-    void onImagePathChanged(String newPath) {
-      if (newPath.isNotEmpty) {
-        validateImageFireDetector(newPath);
-      }
-    }
-
     Future<void> reportFireFighter() async {
+      if (!validateRequiredFields()) return;
+
+      isLoadingUploadImage.value = true;
       try {
         final FirebaseAuth firebaseAuth = FirebaseAuth.instance;
         final usr.User user = usr.User();
@@ -100,11 +87,15 @@ class ReportFireFighter extends StatelessWidget {
 
         final int? userId = await user.getUserIdByUID(firebaseAuth.currentUser!.uid);
         if (userId == null) {
-          return ToastUtils.showError('User ID tidak ditemukan');
+          ToastUtils.showError('User ID tidak ditemukan');
+          return;
         }
 
-        bool isFieldBlank = validareRequiredFields();
-        if (isFieldBlank) return;
+        if (incidentController.text.toLowerCase().contains('kebakaran')) {
+          await handlePredictFirePhoto(imagePathSelected.value);
+        }
+
+        final uploadPhotos = await uploadImage.postUploadPhotos(imagePathSelected.value);
 
         final ReportFireFighterModel report = ReportFireFighterModel(
           title: incidentController.text,
@@ -114,14 +105,18 @@ class ReportFireFighter extends StatelessWidget {
           userId: userId,
           status: 'pending',
           address: streetName.value,
-          imageUrl: '',
+          imageUrl: uploadPhotos?.imageUrl,
         );
 
         await report.insertReport();
+        isSuccessSendReport.value = true;
         ToastUtils.showSuccess('Laporan pemadam kebakaran berhasil dikirim');
-        return Get.back();
+        Get.back();
       } catch (e) {
+        isSuccessSendReport.value = false;
         ToastUtils.showError('Gagal mengirim laporan: $e');
+      } finally {
+        isLoadingUploadImage.value = false;
       }
     }
 
@@ -178,58 +173,46 @@ class ReportFireFighter extends StatelessWidget {
           const SizedBox(height: 16),
           Column(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  border: Border.all(width: 0.3),
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Obx(() {
-                          final String imagePath = imagePathTakePicture.value;
-                          if (imagePath.isNotEmpty) {
-                            onImagePathChanged(imagePath);
-                          }
-                          return CircleAvatar(
-                            backgroundImage: imagePath.isNotEmpty ? FileImage(File(imagePath)) as ImageProvider : null,
-                          );
-                        }),
-                        const SizedBox(width: 12),
-                        const Text("Upload Foto Bukti"),
-                      ],
-                    ),
-                    CameraPermissionButton(imagePathTakePicture: imagePathTakePicture),
-                  ],
-                ),
+              UploadPhotoCard(
+                onImageSelected: (imagePath) async {
+                  imagePathSelected.value = imagePath;
+                  if (incidentController.text.toLowerCase().contains('kebakaran')) {
+                    await handlePredictFirePhoto(imagePath);
+                  }
+                },
               ),
               Obx(
-                () => imagePathTakePicture.value.isNotEmpty
-                    ? Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: redAccent,
-                          borderRadius: const BorderRadius.only(
-                            bottomLeft: Radius.circular(5),
-                            bottomRight: Radius.circular(5),
-                          ),
-                        ),
-                        margin: const EdgeInsets.symmetric(horizontal: 15),
-                        padding: const EdgeInsets.symmetric(vertical: 5),
-                        child: Center(
-                          child: Obx(
-                            () => Text(
-                              isDetectionFire.value ? "Terdeteksi kebakaran" : "Tidak terdeteksi kebakaran",
-                              style: const TextStyle(color: Colors.white),
-                            ),
-                          ),
-                        ),
-                      )
-                    : const SizedBox(),
+                () => Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: imagePathSelected.value.isEmpty ? redAccent : Colors.green.shade400,
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(5),
+                      bottomRight: Radius.circular(5),
+                    ),
+                  ),
+                  margin: const EdgeInsets.symmetric(horizontal: 15),
+                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  child: Center(
+                    child: Obx(
+                      () {
+                        if (imagePathSelected.value.isEmpty) {
+                          return const Text("Belum ambil foto", style: TextStyle(color: Colors.white));
+                        }
+
+                        return incidentController.text.toLowerCase().contains("kebakaran")
+                            ? Text(
+                                isDetectionFire.value
+                                    ? "Terdeteksi kebakaran"
+                                    : isLoadingUploadImage.value
+                                        ? 'Sedang pengecekan foto'
+                                        : 'Tidak terdeteksi kebakaran',
+                                style: const TextStyle(color: Colors.white))
+                            : const Text("Foto telah diambil", style: TextStyle(color: Colors.white));
+                      },
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -239,18 +222,24 @@ class ReportFireFighter extends StatelessWidget {
             streetName: streetName,
           ),
           const SizedBox(height: 16),
-          TextButton(
-            onPressed: reportFireFighter,
-            style: TextButton.styleFrom(
-              backgroundColor: blueAccent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
+          Obx(
+            () => TextButton(
+              onPressed: !isLoadingUploadImage.value ? reportFireFighter : null,
+              style: TextButton.styleFrom(
+                backgroundColor: isLoadingUploadImage.value ? grayAccent : blueAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                minimumSize: const Size(double.infinity, 48),
               ),
-              minimumSize: const Size(double.infinity, 48),
-            ),
-            child: const Text(
-              "Kirim Laporan Pemadam Sekarang",
-              style: TextStyle(color: Colors.white),
+              child: Text(
+                isLoadingUploadImage.value
+                    ? "Sedang upload gambar"
+                    : isSuccessSendReport.value
+                        ? 'Berhasil Kirim!'
+                        : "Kirim Laporan Pemadam Sekarang",
+                style: TextStyle(color: isLoadingUploadImage.value ? Colors.black : Colors.white),
+              ),
             ),
           ),
           const SizedBox(height: 14),

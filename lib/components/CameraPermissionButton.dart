@@ -3,12 +3,14 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import '../utils/colors.dart';
-
 class CameraPermissionButton extends StatelessWidget {
-  final RxString imagePathTakePicture;
+  String imagePathSelected;
+  final void Function(String) onImageSelected;
 
-  CameraPermissionButton({required this.imagePathTakePicture});
+  CameraPermissionButton({
+    required this.imagePathSelected,
+    required this.onImageSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -24,8 +26,8 @@ class CameraPermissionButton extends StatelessWidget {
           );
 
           if (image != null) {
-            imagePathTakePicture.value = image.path;
-            print(imagePathTakePicture.value);
+            imagePathSelected = image.path;
+            onImageSelected(image.path); // Call the callback with the image path
           }
         } else if (status.isDenied || status.isPermanentlyDenied) {
           _showPermissionDialog(context);
@@ -34,7 +36,7 @@ class CameraPermissionButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
         decoration: BoxDecoration(
-          color: grayAccent,
+          color: Colors.grey[300], // Updated color to match grayAccent
           borderRadius: BorderRadius.circular(5),
         ),
         child: const Text("Pilih"),

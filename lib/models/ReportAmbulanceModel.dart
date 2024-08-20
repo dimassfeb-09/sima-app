@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../components/Toast.dart';
+import '../helpers/format_report_date.dart';
 
 class ReportAmbulanceModel {
   String title;
@@ -12,6 +13,7 @@ class ReportAmbulanceModel {
   List<String>? nearby;
   String? address;
   String? createdAt;
+  String? imageUrl;
 
   ReportAmbulanceModel({
     required this.title,
@@ -23,6 +25,7 @@ class ReportAmbulanceModel {
     this.nearby,
     this.address,
     this.createdAt,
+    this.imageUrl,
   });
 
   // Convert a ReportAmbulanceModel into a Map
@@ -36,20 +39,22 @@ class ReportAmbulanceModel {
       'user_id': userId,
       'nearby': nearby,
       'address': address,
+      'image_url': imageUrl,
     };
   }
 
   factory ReportAmbulanceModel.fromMap(Map<String, dynamic> map) {
     return ReportAmbulanceModel(
-      title: map['title'],
-      description: map['description'],
-      status: map['status'],
-      latitude: map['latitude'],
-      longitude: map['longitude'],
-      userId: map['user_id'],
+      title: map['title'] ?? '',
+      description: map['description'] ?? '',
+      status: map['status'] ?? 'Tidak diketahui',
+      latitude: map['latitude'] ?? '',
+      longitude: map['longitude'] ?? '',
+      userId: map['user_id'] ?? '',
       nearby: List<String>.from(map['nearby'] ?? []),
-      address: map['address'] ?? '',
-      createdAt: map['created_at'],
+      address: map['address'] ?? 'Alamat tidak diketahui',
+      imageUrl: map['image_url'] ?? '',
+      createdAt: formatReportDate(map['created_at']),
     );
   }
 

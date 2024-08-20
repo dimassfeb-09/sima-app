@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:project/models/User.dart';
 
+import '../utils/colors.dart';
+
 class ChangePhoneNumberPage extends StatelessWidget {
   const ChangePhoneNumberPage({super.key});
 
@@ -11,14 +13,13 @@ class ChangePhoneNumberPage extends StatelessWidget {
     User user = User();
 
     void handleChangePhoneNumber() async {
-      await user.changePhoneNumber(
-          phoneNumberController.value.text, phoneNumberController.value.text);
+      await user.changePhoneNumber(phoneNumberController.value.text, phoneNumberController.value.text);
     }
 
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          "Change Phone Number",
+          "Ubah Nomor Telepon",
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -48,9 +49,19 @@ class ChangePhoneNumberPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
+            TextButton(
               onPressed: handleChangePhoneNumber,
-              child: const Text("Change Phone Number"),
+              style: TextButton.styleFrom(
+                backgroundColor: blueAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                minimumSize: const Size(double.infinity, 48),
+              ),
+              child: const Text(
+                "Ubah",
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         ),

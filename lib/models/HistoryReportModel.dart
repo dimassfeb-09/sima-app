@@ -19,7 +19,8 @@ class HistoryReportModel {
       usr.User user = usr.User();
       int? userId = await user.getUserIdByUID(uid);
       if (userId == null) return null;
-      final response = await _supabaseClient.from("report_police").select().eq('user_id', userId);
+      final response =
+          await _supabaseClient.from("report_police").select().eq('user_id', userId).order('id', ascending: false);
       List<ReportPoliceModel> reportPoliceModel = ReportPoliceModel.fromList(response);
       return reportPoliceModel;
     } catch (e) {
@@ -33,7 +34,11 @@ class HistoryReportModel {
       usr.User user = usr.User();
       int? userId = await user.getUserIdByUID(uid);
       if (userId == null) return null;
-      final response = await _supabaseClient.from("report_ambulance").select().eq('user_id', userId);
+      final response = await _supabaseClient.from("report_ambulance").select().eq('user_id', userId).order(
+            'id',
+            ascending: false,
+          );
+
       List<ReportAmbulanceModel> reportAmbulanceModel = ReportAmbulanceModel.fromList(response);
       return reportAmbulanceModel;
     } catch (e) {
@@ -47,7 +52,11 @@ class HistoryReportModel {
       usr.User user = usr.User();
       int? userId = await user.getUserIdByUID(uid);
       if (userId == null) return null;
-      final response = await _supabaseClient.from("report_firefighter").select().eq('user_id', userId);
+      final response = await _supabaseClient.from("report_firefighter").select().eq('user_id', userId).order(
+            'id',
+            ascending: false,
+          );
+
       List<ReportFireFighterModel> reportFireFighterModel = ReportFireFighterModel.fromList(response);
       return reportFireFighterModel;
     } catch (e) {
