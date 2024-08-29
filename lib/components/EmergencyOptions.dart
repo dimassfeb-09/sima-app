@@ -28,7 +28,7 @@ class EmergencyOptions extends StatelessWidget {
             buttonLabel: "Pilih",
             onTap: () async {
               bool isPermissionAllowed = await permissionHandler.makeLocationPermission();
-              if (isPermissionAllowed) Get.to(() => const ReportPolicePage());
+              if (isPermissionAllowed) Get.to(() => ReportPolicePage());
             },
           ),
           const Divider(thickness: 0.3),
@@ -38,7 +38,7 @@ class EmergencyOptions extends StatelessWidget {
             buttonLabel: "Pilih",
             onTap: () async {
               bool isPermissionAllowed = await permissionHandler.makeLocationPermission();
-              if (isPermissionAllowed) Get.to(() => const ReportAmbulancePage());
+              if (isPermissionAllowed) Get.to(() => ReportAmbulancePage());
             },
           ),
           const Divider(thickness: 0.3),

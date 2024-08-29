@@ -1,8 +1,10 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:project/utils/here_map.dart';
+import 'package:project/views/HomePage.dart';
 import 'package:project/views/LoginPage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -31,6 +33,11 @@ Future main() async {
 }
 
 class MyApp extends StatelessWidget {
+  Widget isLoggedIn() {
+    FirebaseAuth firebaseAuth = FirebaseAuth.instance;
+    return firebaseAuth.currentUser != null ? const HomePage() : const LoginPage();
+  }
+
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(

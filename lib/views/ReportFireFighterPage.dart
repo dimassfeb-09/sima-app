@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:here_sdk/core.dart';
 import 'package:project/components/Toast.dart';
-import 'package:project/models/ReportFireFighterModel.dart';
 import 'package:project/utils/colors.dart';
 import '../components/UploadPhotoCard.dart';
+import '../models/Reports.dart';
 import '../models/User.dart' as usr;
 import '../components/HereMap.dart';
 import '../services/upload_image.dart';
@@ -97,7 +97,7 @@ class ReportFireFighter extends StatelessWidget {
 
         final uploadPhotos = await uploadImage.postUploadPhotos(imagePathSelected.value);
 
-        final ReportFireFighterModel report = ReportFireFighterModel(
+        final Reports report = Reports(
           title: incidentController.text,
           description: descriptionController.text,
           latitude: coordinates.value.latitude,
@@ -106,6 +106,7 @@ class ReportFireFighter extends StatelessWidget {
           status: 'pending',
           address: streetName.value,
           imageUrl: uploadPhotos?.imageUrl,
+          type: 'firefigter',
         );
 
         await report.insertReport();

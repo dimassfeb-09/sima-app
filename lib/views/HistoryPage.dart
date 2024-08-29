@@ -14,13 +14,13 @@ class HistoryPage extends StatelessWidget {
   void _loadReports() {
     switch (_selectedReportType.value) {
       case 'police':
-        _reportFuture.value = _historyReportModel.getReportPolice();
+        _reportFuture.value = _historyReportModel.getReport('police');
         break;
       case 'firefighter':
-        _reportFuture.value = _historyReportModel.getReportFireFighter();
+        _reportFuture.value = _historyReportModel.getReport('firefighter');
         break;
       default:
-        _reportFuture.value = _historyReportModel.getReportAmbulance();
+        _reportFuture.value = _historyReportModel.getReport('ambulance');
     }
   }
 
@@ -114,6 +114,7 @@ class HistoryPage extends StatelessWidget {
                             margin: const EdgeInsets.only(bottom: 14),
                             child: CardItemReport(
                               reportModel: ReportModel(
+                                id: report.id,
                                 title: report.title,
                                 description: report.description,
                                 coordinates: GeoCoordinates(report.latitude, report.longitude),

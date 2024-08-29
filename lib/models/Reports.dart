@@ -1,33 +1,37 @@
-import 'package:project/helpers/format_report_date.dart';
+import 'package:project/models/Organizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../components/Toast.dart';
+import '../helpers/format_report_date.dart';
 
-class ReportPoliceModel {
+class Reports {
+  int? id;
   String title;
   String description;
   String? status;
   double latitude;
   double longitude;
-  int userId;
-  List<String>? nearby;
+  int? userId;
   String? address;
   String? createdAt;
   String? imageUrl;
+  String type;
 
-  ReportPoliceModel({
+  Reports({
+    this.id,
     required this.title,
     required this.description,
     this.status,
     required this.latitude,
     required this.longitude,
-    required this.userId,
-    this.nearby,
+    this.userId,
     this.address,
     this.createdAt,
     this.imageUrl,
+    required this.type,
   });
 
+  // Convert a Reports into a Map
   Map<String, dynamic> toMap() {
     return {
       'title': title,
@@ -36,37 +40,42 @@ class ReportPoliceModel {
       'latitude': latitude,
       'longitude': longitude,
       'user_id': userId,
-      'nearby': nearby,
       'address': address,
       'image_url': imageUrl,
+      'type': type,
     };
   }
 
-  factory ReportPoliceModel.fromMap(Map<String, dynamic> map) {
-    return ReportPoliceModel(
+  factory Reports.fromMap(Map<String, dynamic> map) {
+    return Reports(
+      id: map['id'] ?? 0,
       title: map['title'] ?? '',
       description: map['description'] ?? '',
       status: map['status'] ?? 'Tidak diketahui',
       latitude: map['latitude'] ?? '',
       longitude: map['longitude'] ?? '',
       userId: map['user_id'] ?? '',
-      nearby: List<String>.from(map['nearby'] ?? []),
       address: map['address'] ?? 'Alamat tidak diketahui',
-      createdAt: formatReportDate(map['created_at']),
       imageUrl: map['image_url'] ?? '',
+      type: map['type'] ?? '',
+      createdAt: formatReportDate(map['created_at']),
     );
   }
 
-  static List<ReportPoliceModel> fromList(List<Map<String, dynamic>> list) {
-    return list.map((map) => ReportPoliceModel.fromMap(map)).toList();
+  static List<Reports> fromList(List<Map<String, dynamic>> list) {
+    return list.map((map) => Reports.fromMap(map)).toList();
   }
 
-  Future<void> insertReport() async {
+  Future<int?> insertReport() async {
     final supabase = Supabase.instance.client;
+
     try {
-      await supabase.from('report_police').insert(toMap());
+      final response = await supabase.from('reports').insert(toMap()).select().single();
+      return response['id'] as int?;
     } catch (e) {
       ToastUtils.showError("Gagal mengirim laporan $e");
     }
+
+    return null;
   }
 }

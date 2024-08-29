@@ -59,6 +59,7 @@ class RegisterPage extends StatelessWidget {
 
         return ToastUtils.showError(authResult.errorMessage ?? 'An unknown error occurred.');
       } catch (e) {
+        print("ERRORRR $e");
         ToastUtils.showError('Unexpected error: $e');
       } finally {
         registerController.setLoading(false);
@@ -77,6 +78,7 @@ class RegisterPage extends StatelessWidget {
 
         return ToastUtils.showError(authResult.errorMessage ?? 'An unknown error occurred.');
       } catch (e) {
+        print("ERRORRR $e");
         ToastUtils.showError('Unexpected error: $e');
       } finally {
         registerController.setLoading(false);

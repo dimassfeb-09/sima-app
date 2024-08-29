@@ -2,117 +2,201 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:here_sdk/core.dart';
+import 'package:project/models/Nearby.dart';
 import 'package:project/services/upload_image.dart';
 import 'package:project/utils/colors.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../components/HereMap.dart';
 import '../components/Toast.dart';
 import '../components/UploadPhotoCard.dart';
-import '../models/ReportPoliceModel.dart';
+import '../helpers/notification_senders.dart';
+import '../models/Reports.dart';
 import '../models/User.dart' as usr;
 
 class ReportPolicePage extends StatelessWidget {
-  const ReportPolicePage({super.key});
+  ReportPolicePage({super.key});
+
+  final TextEditingController incidentController = TextEditingController();
+  final TextEditingController descriptionController = TextEditingController();
+  final UploadImage uploadImage = UploadImage();
+
+  final Rx<GeoCoordinates> coordinates = GeoCoordinates(0, 0).obs;
+  final RxString streetName = ''.obs;
+  final RxString imagePathSelected = ''.obs;
+  final RxString currentLoadingStatus = ''.obs;
+
+  final RxBool isLoading = false.obs;
+  final RxBool isSuccessSendReport = false.obs;
+  final RxBool isLoadingUploadImage = false.obs;
+
+  bool validateRequiredFields() {
+    if (incidentController.text.isEmpty) {
+      ToastUtils.showError('Jenis insiden tidak boleh kosong');
+      return false;
+    }
+
+    if (descriptionController.text.isEmpty) {
+      ToastUtils.showError('Deskripsi insiden tidak boleh kosong');
+      return false;
+    }
+
+    if (imagePathSelected.value.isEmpty) {
+      ToastUtils.showError('Ambil foto terlebih dahulu');
+      return false;
+    }
+
+    if (coordinates.value.latitude == 0 && coordinates.value.longitude == 0) {
+      ToastUtils.showError('Mohon tunggu, sedang mengambil lokasi anda');
+      return false;
+    }
+
+    if (streetName.value.isEmpty) {
+      ToastUtils.showError('Tunggu, sedang mengambil alamat');
+      return false;
+    }
+
+    return true;
+  }
+
+  Future<UploadPhotosResponse?> uploadImageHandler() async {
+    isLoadingUploadImage.value = true;
+    try {
+      final postUploadPhotos = await uploadImage.postUploadPhotos(imagePathSelected.value);
+      return postUploadPhotos;
+    } catch (e) {
+      ToastUtils.showError('Gagal mengunggah gambar: $e');
+      return null;
+    } finally {
+      isLoadingUploadImage.value = false;
+    }
+  }
+
+  Future<Nearby?> getNearbyLocations(double latitude, double longitude, String instanceType) async {
+    try {
+      final response = await Supabase.instance.client.rpc('get_nearby_locations', params: {
+        'current_lat': latitude,
+        'current_lng': longitude,
+        'p_instance_type': instanceType,
+        'limit_location': 1
+      });
+
+      if (response == null) return null;
+
+      final organizationId = response[0]['organization_id'];
+      final distance = response[0]['distance'];
+
+      return Nearby(organizationId: organizationId, distance: distance);
+    } catch (e) {
+      throw Exception('Error get nearby locations: $e');
+    }
+  }
+
+  Future<void> insertReportAssignments(int reportId, Nearby? nearby) async {
+    try {
+      await Supabase.instance.client.from('report_assignments').insert(
+        {
+          'report_id': reportId,
+          'organization_id': nearby?.organizationId,
+          'distance': nearby?.distance,
+          'status': 'pending',
+        },
+      ).eq('id', reportId);
+    } catch (e) {
+      throw Exception('Error updating nearby locations: $e');
+    }
+  }
+
+  Future<void> reportPolice(String instanceType) async {
+    isLoading.value = true; // Set loading state to true before starting operations
+
+    if (!validateRequiredFields()) {
+      isLoading.value = false; // Ensure loading state is reset if validation fails
+      return;
+    }
+
+    try {
+      final FirebaseAuth firebaseAuth = FirebaseAuth.instance;
+      final usr.User user = usr.User();
+
+      if (firebaseAuth.currentUser == null) {
+        throw Exception('User is not authenticated');
+      }
+
+      final int? userId = await user.getUserIdByUID(firebaseAuth.currentUser!.uid);
+      if (userId == null) {
+        ToastUtils.showError('User ID tidak ditemukan');
+        isSuccessSendReport.value = false;
+        return;
+      }
+
+      // Update status for image upload with delay
+      currentLoadingStatus.value = 'Sedang mengunggah gambar...';
+      await Future.delayed(Duration(milliseconds: 200)); // 0.2 second delay
+      final postUploadPhoto = await uploadImageHandler();
+
+      if (postUploadPhoto != null && postUploadPhoto.status) {
+        // Update status for report saving with delay
+        currentLoadingStatus.value = 'Sedang menyimpan laporan...';
+        await Future.delayed(Duration(milliseconds: 200)); // 0.2 second delay
+        final Reports report = Reports(
+          title: incidentController.text,
+          description: descriptionController.text,
+          latitude: coordinates.value.latitude,
+          longitude: coordinates.value.longitude,
+          userId: userId,
+          status: 'pending',
+          address: streetName.value,
+          imageUrl: postUploadPhoto.imageUrl,
+          type: 'police',
+        );
+
+        // Save the report and get nearby locations
+        final reportId = await report.insertReport();
+        if (reportId != null) {
+          // Update status for finding nearby locations with delay
+          currentLoadingStatus.value = 'Sedang mencari instansi terdekat...';
+          await Future.delayed(Duration(milliseconds: 200)); // 0.2 second delay
+          final nearbyLocations = await getNearbyLocations(
+            coordinates.value.latitude,
+            coordinates.value.longitude,
+            instanceType,
+          );
+
+          // Update status for report assignment with delay
+          currentLoadingStatus.value = 'Sedang mengirim laporan ke instansi...';
+          await Future.delayed(Duration(milliseconds: 200)); // 0.2 second delay
+          await insertReportAssignments(
+            reportId,
+            nearbyLocations,
+          );
+
+          await sendNotificationInsertData(
+            title: incidentController.text,
+            description: descriptionController.text,
+            nearby: nearbyLocations,
+            reportId: reportId,
+          );
+        }
+
+        isSuccessSendReport.value = true;
+        ToastUtils.showSuccess('Laporan berhasil dikirim');
+        Get.back();
+      } else {
+        isSuccessSendReport.value = false;
+        ToastUtils.showError('Gagal mengirim laporan, coba lagi');
+      }
+    } catch (e) {
+      isSuccessSendReport.value = false;
+      print("Error sending report: $e");
+      ToastUtils.showError('Gagal mengirim laporan: $e');
+    } finally {
+      isLoading.value = false; // Reset loading state after operations are complete
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    TextEditingController incidentController = TextEditingController();
-    TextEditingController descriptionController = TextEditingController();
-
-    UploadImage uploadImage = UploadImage();
-
-    Rx<GeoCoordinates> coordinates = GeoCoordinates(0, 0).obs;
-    RxString streetName = ''.obs;
-    RxString imagePathSelected = ''.obs;
-    final RxBool isSuccessSendReport = false.obs;
-    final RxBool isLoadingUploadImage = false.obs;
-
-    bool validateRequiredFields() {
-      if (incidentController.text.isEmpty) {
-        ToastUtils.showError('Jenis insiden tidak boleh kosong');
-        return false;
-      }
-
-      if (descriptionController.text.isEmpty) {
-        ToastUtils.showError('Deskripsi insiden tidak boleh kosong');
-        return false;
-      }
-
-      if (imagePathSelected.value.isEmpty) {
-        ToastUtils.showError('Ambil foto terlebih dahulu');
-        return false;
-      }
-
-      if (coordinates.value.latitude == 0 && coordinates.value.longitude == 0) {
-        ToastUtils.showError('Mohon tunggu, sedang mengambil lokasi anda');
-        return false;
-      }
-
-      if (streetName.isEmpty) {
-        ToastUtils.showError('Tunggu, sedang mengambil alamat');
-        return false;
-      }
-
-      return true;
-    }
-
-    Future<UploadPhotosResponse?> uploadImageHandler() async {
-      isLoadingUploadImage.value = true;
-      try {
-        return await uploadImage.postUploadPhotos(imagePathSelected.value);
-      } catch (e) {
-        ToastUtils.showError('Gagal mengunggah gambar: $e');
-        return null;
-      } finally {
-        isLoadingUploadImage.value = false;
-      }
-    }
-
-    Future<void> reportPolice() async {
-      if (!validateRequiredFields()) return;
-
-      try {
-        final FirebaseAuth firebaseAuth = FirebaseAuth.instance;
-        final usr.User user = usr.User();
-
-        if (firebaseAuth.currentUser == null) {
-          throw Exception('User is not authenticated');
-        }
-
-        final int? userId = await user.getUserIdByUID(firebaseAuth.currentUser!.uid);
-        if (userId == null) {
-          ToastUtils.showError('User ID tidak ditemukan');
-          return;
-        }
-
-        final postUploadPhoto = await uploadImageHandler();
-
-        if (postUploadPhoto != null && postUploadPhoto.status) {
-          final ReportPoliceModel report = ReportPoliceModel(
-            title: incidentController.text,
-            description: descriptionController.text,
-            latitude: coordinates.value.latitude,
-            longitude: coordinates.value.longitude,
-            userId: userId,
-            status: 'pending',
-            address: streetName.value,
-            imageUrl: postUploadPhoto.imageUrl,
-          );
-
-          await report.insertReport();
-          isSuccessSendReport.value = true;
-          ToastUtils.showSuccess('Laporan ke polisi berhasil dikirim');
-          Get.back();
-        } else {
-          isSuccessSendReport.value = false;
-          ToastUtils.showError('Gagal mengirim laporan, coba lagi');
-        }
-      } catch (e) {
-        isSuccessSendReport.value = false;
-        ToastUtils.showError('Gagal mengirim laporan: $e');
-      }
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -135,8 +219,8 @@ class ReportPolicePage extends StatelessWidget {
               TextField(
                 controller: incidentController,
                 decoration: const InputDecoration(
-                  hintText: "Contoh: Terjadi pencopetan",
-                  hintStyle: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.normal),
+                  hintText: "contoh: serangan jantung",
+                  hintStyle: TextStyle(fontSize: 12, color: Colors.grey),
                   isDense: true,
                   contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
                   border: OutlineInputBorder(),
@@ -156,14 +240,14 @@ class ReportPolicePage extends StatelessWidget {
                 maxLines: null,
                 minLines: 5,
                 decoration: const InputDecoration(
-                  hintText: "Terjadi pencopetan di Mixue Beji, Depok.",
-                  hintStyle: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.normal),
+                  hintText: "Terjadi serangan jantung pada Ibu saya",
+                  hintStyle: TextStyle(fontSize: 12, color: Colors.grey),
                   isDense: true,
                   contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.text,
-              )
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -200,21 +284,23 @@ class ReportPolicePage extends StatelessWidget {
           const SizedBox(height: 16),
           Obx(
             () => TextButton(
-              onPressed: !isLoadingUploadImage.value ? reportPolice : null,
+              onPressed: !isLoadingUploadImage.value ? () => reportPolice('police') : null,
               style: TextButton.styleFrom(
-                backgroundColor: isLoadingUploadImage.value ? grayAccent : blueAccent,
+                backgroundColor: isLoading.value ? grayAccent : blueAccent,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(5),
                 ),
                 minimumSize: const Size(double.infinity, 48),
               ),
-              child: Text(
-                isLoadingUploadImage.value
-                    ? "Sedang upload gambar"
-                    : isSuccessSendReport.value
-                        ? 'Berhasil Kirim!'
-                        : "Kirim Laporan Polisi Sekarang",
-                style: const TextStyle(color: Colors.white),
+              child: Obx(
+                () => Text(
+                  isLoading.value
+                      ? currentLoadingStatus.value
+                      : isSuccessSendReport.value
+                          ? 'Berhasil Kirim!'
+                          : "Kirim Laporan Polisi Sekarang",
+                  style: TextStyle(color: isLoading.value ? Colors.black : Colors.white),
+                ),
               ),
             ),
           ),

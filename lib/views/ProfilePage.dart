@@ -5,6 +5,7 @@ import 'package:project/models/User.dart';
 import 'package:project/views/ChangeEmailPage.dart';
 import 'package:project/views/ChangePasswordPage.dart';
 import 'package:project/views/ChangePhonePage.dart';
+import 'package:project/views/LoginPage.dart';
 import '../utils/colors.dart';
 
 class ProfilePage extends StatelessWidget {
@@ -84,7 +85,7 @@ class ProfilePage extends StatelessWidget {
                           _buildOptionRow(
                             icon: Icons.numbers,
                             label: "NIK",
-                            value: userDetail.nik ?? 'gak ada',
+                            value: userDetail.nik ?? 'Belum atur',
                             isEditable: userDetail.nik == '',
                           ),
                           const Divider(thickness: 0.3),
@@ -155,8 +156,9 @@ class ProfilePage extends StatelessWidget {
                               try {
                                 await user.signOutAccount();
                                 ToastUtils.showSuccess("Berhasil keluar");
-                                Get.offAllNamed('/login'); // Redirect to login page after logout
+                                Get.offAll(() => const LoginPage());
                               } catch (e) {
+                                print("gagal keluar $e");
                                 ToastUtils.showError('Gagal keluar: $e');
                               } finally {
                                 isLoading.value = false;
