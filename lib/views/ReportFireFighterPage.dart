@@ -106,7 +106,7 @@ class ReportFireFighter extends StatelessWidget {
           status: 'pending',
           address: streetName.value,
           imageUrl: uploadPhotos?.imageUrl,
-          type: 'firefigter',
+          type: 'firefighter',
         );
 
         await report.insertReport();

@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:here_sdk/core.dart';
+import 'package:project/helpers/notification_senders.dart';
 import 'package:project/models/Nearby.dart';
 import 'package:project/services/upload_image.dart';
 import 'package:project/utils/colors.dart';
@@ -10,12 +11,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../components/HereMap.dart';
 import '../components/Toast.dart';
 import '../components/UploadPhotoCard.dart';
-import '../helpers/notification_senders.dart';
 import '../models/Reports.dart';
 import '../models/User.dart' as usr;
 
 class ReportPolicePage extends StatelessWidget {
   ReportPolicePage({super.key});
+
+  final Supabase supabase = Supabase.instance;
 
   final TextEditingController incidentController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
@@ -74,7 +76,7 @@ class ReportPolicePage extends StatelessWidget {
 
   Future<Nearby?> getNearbyLocations(double latitude, double longitude, String instanceType) async {
     try {
-      final response = await Supabase.instance.client.rpc('get_nearby_locations', params: {
+      final response = await supabase.client.rpc('get_nearby_locations', params: {
         'current_lat': latitude,
         'current_lng': longitude,
         'p_instance_type': instanceType,
@@ -94,7 +96,7 @@ class ReportPolicePage extends StatelessWidget {
 
   Future<void> insertReportAssignments(int reportId, Nearby? nearby) async {
     try {
-      await Supabase.instance.client.from('report_assignments').insert(
+      await supabase.client.from('report_assignments').insert(
         {
           'report_id': reportId,
           'organization_id': nearby?.organizationId,
@@ -108,10 +110,12 @@ class ReportPolicePage extends StatelessWidget {
   }
 
   Future<void> reportPolice(String instanceType) async {
-    isLoading.value = true; // Set loading state to true before starting operations
+    print("Started upload");
+
+    isLoading.value = true;
 
     if (!validateRequiredFields()) {
-      isLoading.value = false; // Ensure loading state is reset if validation fails
+      isLoading.value = false;
       return;
     }
 
@@ -130,15 +134,11 @@ class ReportPolicePage extends StatelessWidget {
         return;
       }
 
-      // Update status for image upload with delay
       currentLoadingStatus.value = 'Sedang mengunggah gambar...';
-      await Future.delayed(Duration(milliseconds: 200)); // 0.2 second delay
       final postUploadPhoto = await uploadImageHandler();
 
       if (postUploadPhoto != null && postUploadPhoto.status) {
-        // Update status for report saving with delay
         currentLoadingStatus.value = 'Sedang menyimpan laporan...';
-        await Future.delayed(Duration(milliseconds: 200)); // 0.2 second delay
         final Reports report = Reports(
           title: incidentController.text,
           description: descriptionController.text,
@@ -151,26 +151,20 @@ class ReportPolicePage extends StatelessWidget {
           type: 'police',
         );
 
-        // Save the report and get nearby locations
         final reportId = await report.insertReport();
         if (reportId != null) {
-          // Update status for finding nearby locations with delay
           currentLoadingStatus.value = 'Sedang mencari instansi terdekat...';
-          await Future.delayed(Duration(milliseconds: 200)); // 0.2 second delay
           final nearbyLocations = await getNearbyLocations(
             coordinates.value.latitude,
             coordinates.value.longitude,
             instanceType,
           );
 
-          // Update status for report assignment with delay
           currentLoadingStatus.value = 'Sedang mengirim laporan ke instansi...';
-          await Future.delayed(Duration(milliseconds: 200)); // 0.2 second delay
           await insertReportAssignments(
             reportId,
             nearbyLocations,
           );
-
           await sendNotificationInsertData(
             title: incidentController.text,
             description: descriptionController.text,
@@ -188,10 +182,9 @@ class ReportPolicePage extends StatelessWidget {
       }
     } catch (e) {
       isSuccessSendReport.value = false;
-      print("Error sending report: $e");
       ToastUtils.showError('Gagal mengirim laporan: $e');
     } finally {
-      isLoading.value = false; // Reset loading state after operations are complete
+      isLoading.value = false;
     }
   }
 

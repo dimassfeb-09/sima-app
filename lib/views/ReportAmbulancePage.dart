@@ -110,10 +110,10 @@ class ReportAmbulancePage extends StatelessWidget {
   }
 
   Future<void> reportAmbulance(String instanceType) async {
-    isLoading.value = true; // Set loading state to true before starting operations
+    isLoading.value = true;
 
     if (!validateRequiredFields()) {
-      isLoading.value = false; // Ensure loading state is reset if validation fails
+      isLoading.value = false;
       return;
     }
 
@@ -132,15 +132,11 @@ class ReportAmbulancePage extends StatelessWidget {
         return;
       }
 
-      // Update status for image upload with delay
       currentLoadingStatus.value = 'Sedang mengunggah gambar...';
-      await Future.delayed(Duration(milliseconds: 200)); // 0.2 second delay
       final postUploadPhoto = await uploadImageHandler();
 
       if (postUploadPhoto != null && postUploadPhoto.status) {
-        // Update status for report saving with delay
         currentLoadingStatus.value = 'Sedang menyimpan laporan...';
-        await Future.delayed(Duration(milliseconds: 200)); // 0.2 second delay
         final Reports report = Reports(
           title: incidentController.text,
           description: descriptionController.text,
@@ -153,21 +149,16 @@ class ReportAmbulancePage extends StatelessWidget {
           type: 'ambulance',
         );
 
-        // Save the report and get nearby locations
         final reportId = await report.insertReport();
         if (reportId != null) {
-          // Update status for finding nearby locations with delay
           currentLoadingStatus.value = 'Sedang mencari instansi terdekat...';
-          await Future.delayed(Duration(milliseconds: 200)); // 0.2 second delay
           final nearbyLocations = await getNearbyLocations(
             coordinates.value.latitude,
             coordinates.value.longitude,
             instanceType,
           );
 
-          // Update status for report assignment with delay
           currentLoadingStatus.value = 'Sedang mengirim laporan ke instansi...';
-          await Future.delayed(Duration(milliseconds: 200)); // 0.2 second delay
           await insertReportAssignments(
             reportId,
             nearbyLocations,
@@ -191,7 +182,8 @@ class ReportAmbulancePage extends StatelessWidget {
       isSuccessSendReport.value = false;
       ToastUtils.showError('Gagal mengirim laporan: $e');
     } finally {
-      isLoading.value = false; // Reset loading state after operations are complete
+      final endTime = DateTime.now();
+      isLoading.value = false;
     }
   }
 
