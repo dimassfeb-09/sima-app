@@ -182,7 +182,6 @@ class ReportAmbulancePage extends StatelessWidget {
       isSuccessSendReport.value = false;
       ToastUtils.showError('Gagal mengirim laporan: $e');
     } finally {
-      final endTime = DateTime.now();
       isLoading.value = false;
     }
   }

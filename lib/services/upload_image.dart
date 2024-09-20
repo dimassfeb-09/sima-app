@@ -50,13 +50,10 @@ class UploadImage {
 
       if (response.statusCode == 200) {
         final predictFireResponse = PredictFireResponse.fromJson(response.data);
-        print('Prediction: ${predictFireResponse.prediction}');
         return predictFireResponse;
-      } else {
-        print('Failed to upload file: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error occurred while uploading file: $e');
+      throw "occurred while uploading file";
     }
     return null;
   }

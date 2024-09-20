@@ -1,10 +1,18 @@
+import 'dart:io';
+
+import 'package:dropdown_search/dropdown_search.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:here_sdk/core.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:project/components/CameraPermissionButton.dart';
 import 'package:project/components/Toast.dart';
 import 'package:project/utils/colors.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../components/UploadPhotoCard.dart';
+import '../helpers/notification_senders.dart';
+import '../models/Nearby.dart';
 import '../models/Reports.dart';
 import '../models/User.dart' as usr;
 import '../components/HereMap.dart';
@@ -15,9 +23,11 @@ class ReportFireFighter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final TextEditingController selectedIncidentController = TextEditingController();
     final TextEditingController incidentController = TextEditingController();
     final TextEditingController descriptionController = TextEditingController();
 
+    final Supabase supabase = Supabase.instance;
     final UploadImage uploadImage = UploadImage();
 
     final Rx<GeoCoordinates> coordinates = GeoCoordinates(0, 0).obs;
@@ -26,6 +36,9 @@ class ReportFireFighter extends StatelessWidget {
     final RxBool isDetectionFire = false.obs;
     final RxBool isLoadingUploadImage = false.obs;
     final RxBool isSuccessSendReport = false.obs;
+    final RxString currentLoadingStatus = ''.obs;
+    final RxBool isLoading = false.obs;
+    final RxBool isIncidentControllerFieldActive = false.obs;
 
     bool validateRequiredFields() {
       if (incidentController.text.isEmpty) {
@@ -56,16 +69,55 @@ class ReportFireFighter extends StatelessWidget {
       return true;
     }
 
+    Future<Nearby?> getNearbyLocations(double latitude, double longitude, String instanceType) async {
+      try {
+        final response = await supabase.client.rpc('get_nearby_locations', params: {
+          'current_lat': latitude,
+          'current_lng': longitude,
+          'p_instance_type': instanceType,
+          'limit_location': 1
+        });
+
+        if (response == null) return null;
+
+        final organizationId = response[0]['organization_id'];
+        final distance = response[0]['distance'];
+
+        return Nearby(organizationId: organizationId, distance: distance);
+      } catch (e) {
+        throw Exception('Error get nearby locations: $e');
+      }
+    }
+
+    Future<void> insertReportAssignments(int reportId, Nearby? nearby) async {
+      try {
+        await supabase.client.from('report_assignments').insert(
+          {
+            'report_id': reportId,
+            'organization_id': nearby?.organizationId,
+            'distance': nearby?.distance,
+            'status': 'pending',
+          },
+        ).eq('id', reportId);
+      } catch (e) {
+        throw Exception('Error updating nearby locations: $e');
+      }
+    }
+
     Future<void> handlePredictFirePhoto(String imagePath) async {
       isLoadingUploadImage.value = true;
       try {
-        final postPredictFire = await uploadImage.postPredictFire(imagePath);
-
-        if (postPredictFire != null && postPredictFire.probability > 0.8) {
-          isDetectionFire.value = true;
-        } else {
-          isDetectionFire.value = false;
+        XFile? fileCompres = await compressImage(File(imagePath), resolution: ImageResolution.p720);
+        if (fileCompres != null) {
+          final postPredictFire = await uploadImage.postPredictFire(fileCompres.path);
+          if (postPredictFire != null && postPredictFire.probability > 0.8) {
+            isDetectionFire.value = true;
+          } else {
+            isDetectionFire.value = false;
+          }
         }
+
+        return;
       } catch (e) {
         ToastUtils.showError('Gagal upload gambar: $e');
       } finally {
@@ -74,7 +126,12 @@ class ReportFireFighter extends StatelessWidget {
     }
 
     Future<void> reportFireFighter() async {
-      if (!validateRequiredFields()) return;
+      isLoading.value = true;
+
+      if (!validateRequiredFields()) {
+        isLoading.value = false;
+        return;
+      }
 
       isLoadingUploadImage.value = true;
       try {
@@ -109,7 +166,29 @@ class ReportFireFighter extends StatelessWidget {
           type: 'firefighter',
         );
 
-        await report.insertReport();
+        int? reportId = await report.insertReport();
+
+        if (reportId != null) {
+          currentLoadingStatus.value = 'Sedang mencari instansi terdekat...';
+          final nearbyLocations = await getNearbyLocations(
+            coordinates.value.latitude,
+            coordinates.value.longitude,
+            'firefighter',
+          );
+
+          currentLoadingStatus.value = 'Sedang mengirim laporan ke instansi...';
+          await insertReportAssignments(
+            reportId,
+            nearbyLocations,
+          );
+          await sendNotificationInsertData(
+            title: incidentController.text,
+            description: descriptionController.text,
+            nearby: nearbyLocations,
+            reportId: reportId,
+          );
+        }
+
         isSuccessSendReport.value = true;
         ToastUtils.showSuccess('Laporan pemadam kebakaran berhasil dikirim');
         Get.back();
@@ -117,6 +196,7 @@ class ReportFireFighter extends StatelessWidget {
         isSuccessSendReport.value = false;
         ToastUtils.showError('Gagal mengirim laporan: $e');
       } finally {
+        isLoading.value = false;
         isLoadingUploadImage.value = false;
       }
     }
@@ -136,17 +216,42 @@ class ReportFireFighter extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text("Jenis Insiden"),
+              DropdownSearch<String>(
+                selectedItem: selectedIncidentController.text.isNotEmpty ? selectedIncidentController.text : null,
+                items: (filter, loadProps) => ["Kebakaran", "Lainnya"],
+                dropdownBuilder: (context, selectedItem) {
+                  return Text(
+                    selectedItem ?? 'Pilih Jenis Insiden',
+                    style: TextStyle(
+                      color: selectedItem == null ? Colors.grey : Colors.black,
+                    ),
+                  );
+                },
+                onChanged: (value) {
+                  selectedIncidentController.text = value ?? '';
+                  incidentController.text = (value != "Lainnya" ? value : '')!;
+                  isIncidentControllerFieldActive.value = (value == "Lainnya");
+                },
+              ),
               const SizedBox(height: 10),
-              TextField(
-                controller: incidentController,
-                decoration: const InputDecoration(
-                  hintText: "Contoh: Kebakaran di Pasar Baru",
-                  hintStyle: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.normal),
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.text,
+              Obx(
+                () => isIncidentControllerFieldActive.value
+                    ? TextField(
+                        controller: incidentController,
+                        decoration: const InputDecoration(
+                          hintText: "Contoh: Kebakaran",
+                          hintStyle: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                            fontWeight: FontWeight.normal,
+                          ),
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.text,
+                      )
+                    : const SizedBox(),
               ),
             ],
           ),
@@ -209,7 +314,10 @@ class ReportFireFighter extends StatelessWidget {
                                         ? 'Sedang pengecekan foto'
                                         : 'Tidak terdeteksi kebakaran',
                                 style: const TextStyle(color: Colors.white))
-                            : const Text("Foto telah diambil", style: TextStyle(color: Colors.white));
+                            : const Text(
+                                "Foto telah diambil",
+                                style: TextStyle(color: Colors.white),
+                              );
                       },
                     ),
                   ),
@@ -233,13 +341,15 @@ class ReportFireFighter extends StatelessWidget {
                 ),
                 minimumSize: const Size(double.infinity, 48),
               ),
-              child: Text(
-                isLoadingUploadImage.value
-                    ? "Sedang upload gambar"
-                    : isSuccessSendReport.value
-                        ? 'Berhasil Kirim!'
-                        : "Kirim Laporan Pemadam Sekarang",
-                style: TextStyle(color: isLoadingUploadImage.value ? Colors.black : Colors.white),
+              child: Obx(
+                () => Text(
+                  isLoading.value
+                      ? currentLoadingStatus.value
+                      : isSuccessSendReport.value
+                          ? 'Berhasil Kirim!'
+                          : "Kirim Laporan Pemadam Sekarang",
+                  style: TextStyle(color: isLoading.value ? Colors.black : Colors.white),
+                ),
               ),
             ),
           ),

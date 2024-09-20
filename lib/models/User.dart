@@ -110,6 +110,31 @@ class User {
     }
   }
 
+  Future<bool> createUser({
+    required String uid,
+    required String fullName,
+    required String email,
+    required String nik,
+  }) async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      await supabase.from('users').insert({
+        'uid': uid,
+        'full_name': fullName,
+        'email': email,
+        'nik': nik,
+        'account_type': 'user',
+      });
+
+      ToastUtils.showSuccess('User created successfully.');
+      return true;
+    } catch (e) {
+      ToastUtils.showError('Error creating user: $e');
+      return false;
+    }
+  }
+
   Future<void> signOutAccount() async {
     try {
       Auth auth = Auth();

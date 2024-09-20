@@ -33,7 +33,10 @@ class UploadPhotoCard extends StatelessWidget {
                   child: imagePath.isEmpty ? const Icon(Icons.camera_alt, color: Colors.grey) : null,
                 ),
                 const SizedBox(width: 12),
-                const Text('Ambil gambar keadaan di lokasi'),
+                const Text(
+                  'Ambil gambar keadaan di lokasi',
+                  style: TextStyle(fontSize: 12),
+                ),
               ],
             );
           }),

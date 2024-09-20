@@ -212,7 +212,7 @@ class ReportPolicePage extends StatelessWidget {
               TextField(
                 controller: incidentController,
                 decoration: const InputDecoration(
-                  hintText: "contoh: serangan jantung",
+                  hintText: "Contoh: Kemalingan HP",
                   hintStyle: TextStyle(fontSize: 12, color: Colors.grey),
                   isDense: true,
                   contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
@@ -233,7 +233,7 @@ class ReportPolicePage extends StatelessWidget {
                 maxLines: null,
                 minLines: 5,
                 decoration: const InputDecoration(
-                  hintText: "Terjadi serangan jantung pada Ibu saya",
+                  hintText: "Contoh: Terjadi kemalingan di rumah saya",
                   hintStyle: TextStyle(fontSize: 12, color: Colors.grey),
                   isDense: true,
                   contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),

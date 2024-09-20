@@ -1,10 +1,14 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get_state_manager/get_state_manager.dart';
 import 'package:get/route_manager.dart';
 import 'package:project/models/Auth.dart';
 import 'package:project/utils/colors.dart';
-import 'package:project/views/MainPage.dart';
+import 'package:project/views/CompletedUserInfoPage.dart';
+import 'package:project/views/HomePage.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../components/Toast.dart';
 import '../controller/RegisterController.dart';
@@ -20,6 +24,7 @@ class RegisterPage extends StatelessWidget {
     final TextEditingController nikController = TextEditingController();
     final TextEditingController emailController = TextEditingController();
     final TextEditingController passwordController = TextEditingController();
+    Supabase supabase = Supabase.instance;
 
     bool validateRequiredTextField() {
       if (nameController.text.isEmpty ||
@@ -70,17 +75,27 @@ class RegisterPage extends StatelessWidget {
       registerController.setLoading(true);
 
       try {
-        AuthResult authResult = await auth.signUpWithGoogle();
-        if (authResult.isSuccess) {
-          ToastUtils.showSuccess('Registration successful, welcome.');
-          return Get.offAll(() => MainPage());
-        }
+        final AuthResult authResult = await auth.signUpWithGoogle();
+        final String? uid = authResult.uid;
 
-        return ToastUtils.showError(authResult.errorMessage ?? 'An unknown error occurred.');
+        if (authResult.isSuccess && uid != null) {
+          final response = await supabase.client.from('users').select().eq('uid', uid).maybeSingle();
+
+          if (response != null) {
+            ToastUtils.showSuccess('Registration successful, welcome.');
+            Get.offAll(() => const HomePage());
+          } else {
+            ToastUtils.showSuccess('Please complete your user info.');
+            Get.offAll(() => const CompletedUserInfoPage());
+          }
+        } else {
+          ToastUtils.showError(authResult.errorMessage ?? 'An unknown error occurred.');
+        }
       } catch (e) {
-        print("ERRORRR $e");
+        // Catch unexpected errors and display a toast message
         ToastUtils.showError('Unexpected error: $e');
       } finally {
+        // Reset loading state
         registerController.setLoading(false);
       }
     }

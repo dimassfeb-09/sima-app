@@ -4,9 +4,12 @@ import 'package:get/get.dart';
 import 'package:project/utils/colors.dart';
 import 'package:project/views/ForgotPasswordPage.dart';
 import 'package:project/views/RegisterPage.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../components/Toast.dart';
 import '../controller/LoginController.dart';
 import '../models/Auth.dart';
+import 'CompletedUserInfoPage.dart';
+import 'HomePage.dart';
 import 'MainPage.dart';
 
 class LoginPage extends StatelessWidget {
@@ -16,6 +19,8 @@ class LoginPage extends StatelessWidget {
   Widget build(BuildContext context) {
     LoginController loginController = LoginController();
     Auth auth = Auth();
+    Supabase supabase = Supabase.instance;
+
     TextEditingController emailController = TextEditingController();
     TextEditingController passwordController = TextEditingController();
 
@@ -61,12 +66,21 @@ class LoginPage extends StatelessWidget {
 
       try {
         AuthResult authResult = await auth.signInWithGoogle();
-        if (authResult.isSuccess) {
-          ToastUtils.showSuccess('Login successful, welcome.');
-          return Get.offAll(() => MainPage());
-        }
+        final String? uid = authResult.uid;
 
-        return ToastUtils.showError(authResult.errorMessage ?? 'An unknown error occurred.');
+        if (authResult.isSuccess && uid != null) {
+          final response = await supabase.client.from('users').select().eq('uid', uid).maybeSingle();
+
+          if (response != null) {
+            ToastUtils.showSuccess('Login successful, welcome.');
+            Get.offAll(() => MainPage());
+          } else {
+            ToastUtils.showSuccess('Please complete your user info.');
+            Get.offAll(() => const CompletedUserInfoPage());
+          }
+        } else {
+          ToastUtils.showError(authResult.errorMessage ?? 'An unknown error occurred.');
+        }
       } catch (e) {
         ToastUtils.showError('Unexpected error: $e');
       } finally {
@@ -86,7 +100,7 @@ class LoginPage extends StatelessWidget {
         centerTitle: true,
       ),
       body: ListView(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         children: [
           const Text(
             "Masuk ke Akun Anda",
