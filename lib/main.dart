@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fa;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -6,12 +6,14 @@ import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:project/utils/here_map.dart';
 import 'package:project/views/HomePage.dart';
 import 'package:project/views/LoginPage.dart';
+import 'package:project/views/MainPage.dart';
+import 'package:project/views/SplashScreenPage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'utils/colors.dart';
 import 'utils/firebase_options.dart';
 
-Future main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
 
@@ -29,14 +31,11 @@ Future main() async {
     accessKeySecret: dotenv.env['ACCESS_KEY_SECRET'] ?? '',
   );
 
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  Widget isLoggedIn() {
-    FirebaseAuth firebaseAuth = FirebaseAuth.instance;
-    return firebaseAuth.currentUser != null ? const HomePage() : const LoginPage();
-  }
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +49,7 @@ class MyApp extends StatelessWidget {
           unselectedItemColor: grayAccent,
         ),
       ),
-      home: const LoginPage(),
+      home: const SplashScreenPage(), // Set SplashScreen as the home
     );
   }
 }

@@ -354,18 +354,22 @@ class ReportFireFighter extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          TextButton(
-            onPressed: () => Get.back(),
-            style: TextButton.styleFrom(
-              backgroundColor: redAccent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(5),
+          Obx(
+            () => TextButton(
+              onPressed: () => isLoading.value
+                  ? ToastUtils.showSuccess("Tidak dapat membatalkan, sedang mengirim laporan")
+                  : Get.back(),
+              style: TextButton.styleFrom(
+                backgroundColor: isLoading.value ? grayAccent : redAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                minimumSize: const Size(double.infinity, 48),
               ),
-              minimumSize: const Size(double.infinity, 48),
-            ),
-            child: const Text(
-              "Batalkan Permintaan",
-              style: TextStyle(color: Colors.white),
+              child: Text(
+                "Batalkan Permintaan",
+                style: TextStyle(color: isLoading.value ? Colors.grey.shade400 : grayAccent),
+              ),
             ),
           ),
         ],
