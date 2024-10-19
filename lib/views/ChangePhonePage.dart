@@ -13,7 +13,8 @@ class ChangePhoneNumberPage extends StatelessWidget {
     User user = User();
 
     void handleChangePhoneNumber() async {
-      await user.changePhoneNumber(phoneNumberController.value.text, phoneNumberController.value.text);
+      await user.changePhoneNumber(
+          phoneNumberController.value.text, passwordController.value.text);
     }
 
     return Scaffold(
@@ -33,9 +34,10 @@ class ChangePhoneNumberPage extends StatelessWidget {
           children: [
             TextField(
               controller: phoneNumberController,
-              keyboardType: TextInputType.phone,
+              keyboardType: TextInputType.number,
               decoration: const InputDecoration(
-                hintText: "Enter new phone number",
+                icon: Text("+62"),
+                hintText: "Enter new phone number (8xxxx)",
                 border: OutlineInputBorder(),
               ),
             ),

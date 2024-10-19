@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../interfaces/auth_interface.dart';
 
 class AuthResult {
@@ -21,7 +22,8 @@ class Auth implements AuthInterface {
     required String password,
   }) async {
     try {
-      UserCredential userCredential = await _firebaseAuth.signInWithEmailAndPassword(
+      UserCredential userCredential =
+          await _firebaseAuth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -30,9 +32,11 @@ class Auth implements AuthInterface {
         uid: userCredential.user?.uid,
       );
     } on FirebaseAuthException catch (e) {
-      return AuthResult(isSuccess: false, errorMessage: _handleAuthException(e));
+      return AuthResult(
+          isSuccess: false, errorMessage: _handleAuthException(e));
     } catch (e) {
-      return AuthResult(isSuccess: false, errorMessage: 'Error during sign in: $e');
+      return AuthResult(
+          isSuccess: false, errorMessage: 'Error during sign in: $e');
     }
   }
 
@@ -41,30 +45,35 @@ class Auth implements AuthInterface {
     required String name,
     required String nik,
     required String email,
+    required String phone,
     required String password,
   }) async {
     try {
       // Create a new user with email and password
-      UserCredential userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
+      UserCredential userCredential =
+          await _firebaseAuth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
       // Update user profile with display name
       await userCredential.user?.updateProfile(displayName: name);
+      await userCredential.user?.linkWithPhoneNumber("62$phone");
 
       // Insert user data into Supabase
       await _supabaseClient.from('users').insert({
         'uid': userCredential.user?.uid,
         'full_name': name,
         'email': email,
+        'phone': phone,
         'nik': nik,
       }).onError(
         (error, stackTrace) async {
           await userCredential.user?.delete();
           return AuthResult(
             isSuccess: false,
-            errorMessage: 'Failed to insert user data: ${error?.toString() ?? ''}',
+            errorMessage:
+                'Failed to insert user data: ${error?.toString() ?? ''}',
           );
         },
       );
@@ -92,22 +101,26 @@ class Auth implements AuthInterface {
     try {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
-        return AuthResult(isSuccess: false, errorMessage: 'Sign in aborted by user.');
+        return AuthResult(
+            isSuccess: false, errorMessage: 'Sign in aborted by user.');
       }
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      UserCredential userCredential = await _firebaseAuth.signInWithCredential(credential);
+      UserCredential userCredential =
+          await _firebaseAuth.signInWithCredential(credential);
       return AuthResult(
         uid: userCredential.user?.uid,
         isSuccess: userCredential.user != null,
       );
     } catch (e) {
-      return AuthResult(isSuccess: false, errorMessage: 'Error during Google sign in: $e');
+      return AuthResult(
+          isSuccess: false, errorMessage: 'Error during Google sign in: $e');
     }
   }
 
@@ -116,23 +129,27 @@ class Auth implements AuthInterface {
     try {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
-        return AuthResult(isSuccess: false, errorMessage: 'Sign in aborted by user.');
+        return AuthResult(
+            isSuccess: false, errorMessage: 'Sign in aborted by user.');
       }
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      UserCredential userCredential = await _firebaseAuth.signInWithCredential(credential);
+      UserCredential userCredential =
+          await _firebaseAuth.signInWithCredential(credential);
       return AuthResult(
         uid: userCredential.user?.uid,
         isSuccess: userCredential.user != null,
       );
     } catch (e) {
       print(e);
-      return AuthResult(isSuccess: false, errorMessage: 'Error during Google sign up: $e');
+      return AuthResult(
+          isSuccess: false, errorMessage: 'Error during Google sign up: $e');
     }
   }
 

@@ -1,12 +1,8 @@
-import 'package:firebase_auth/firebase_auth.dart' as fa;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:project/utils/here_map.dart';
-import 'package:project/views/HomePage.dart';
-import 'package:project/views/LoginPage.dart';
-import 'package:project/views/MainPage.dart';
 import 'package:project/views/SplashScreenPage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 

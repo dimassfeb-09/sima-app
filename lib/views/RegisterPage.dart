@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get_state_manager/get_state_manager.dart';
@@ -22,6 +20,7 @@ class RegisterPage extends StatelessWidget {
     RegisterController registerController = RegisterController();
     final TextEditingController nameController = TextEditingController();
     final TextEditingController nikController = TextEditingController();
+    final TextEditingController phoneController = TextEditingController();
     final TextEditingController emailController = TextEditingController();
     final TextEditingController passwordController = TextEditingController();
     Supabase supabase = Supabase.instance;
@@ -30,8 +29,29 @@ class RegisterPage extends StatelessWidget {
       if (nameController.text.isEmpty ||
           emailController.text.isEmpty ||
           passwordController.text.isEmpty ||
-          nikController.text.isEmpty) {
+          nikController.text.isEmpty ||
+          phoneController.text.isEmpty) {
         ToastUtils.showError("All fields are required");
+        return false;
+      }
+
+      if (nikController.text.length < 16) {
+        ToastUtils.showError("NIK minimal 16 digit.");
+        return false;
+      }
+
+      if (nikController.text.length > 16) {
+        ToastUtils.showError("NIK maksimal 16 digit.");
+        return false;
+      }
+
+      if (phoneController.text.length < 11) {
+        ToastUtils.showError("Nomor telepon minimum 11 digit.");
+        return false;
+      }
+
+      if (phoneController.text.length > 13) {
+        ToastUtils.showError("Nomor telepon maksimal 13 digit.");
         return false;
       }
       return true;
@@ -49,10 +69,12 @@ class RegisterPage extends StatelessWidget {
         final nik = nikController.text;
         final email = emailController.text;
         final password = passwordController.text;
+        final phone = phoneController.text;
 
         AuthResult authResult = await auth.signUpWithEmailAndPassword(
           name: name,
           nik: nik,
+          phone: phone,
           email: email,
           password: password,
         );
@@ -62,7 +84,8 @@ class RegisterPage extends StatelessWidget {
           return Get.back();
         }
 
-        return ToastUtils.showError(authResult.errorMessage ?? 'An unknown error occurred.');
+        return ToastUtils.showError(
+            authResult.errorMessage ?? 'An unknown error occurred.');
       } catch (e) {
         print("ERRORRR $e");
         ToastUtils.showError('Unexpected error: $e');
@@ -79,7 +102,11 @@ class RegisterPage extends StatelessWidget {
         final String? uid = authResult.uid;
 
         if (authResult.isSuccess && uid != null) {
-          final response = await supabase.client.from('users').select().eq('uid', uid).maybeSingle();
+          final response = await supabase.client
+              .from('users')
+              .select()
+              .eq('uid', uid)
+              .maybeSingle();
 
           if (response != null) {
             ToastUtils.showSuccess('Registration successful, welcome.');
@@ -89,7 +116,8 @@ class RegisterPage extends StatelessWidget {
             Get.offAll(() => const CompletedUserInfoPage());
           }
         } else {
-          ToastUtils.showError(authResult.errorMessage ?? 'An unknown error occurred.');
+          ToastUtils.showError(
+              authResult.errorMessage ?? 'An unknown error occurred.');
         }
       } catch (e) {
         // Catch unexpected errors and display a toast message
@@ -124,7 +152,8 @@ class RegisterPage extends StatelessWidget {
                 decoration: const InputDecoration(
                   hintText: "Masukkan nama",
                   isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+                  contentPadding:
+                      EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -142,7 +171,28 @@ class RegisterPage extends StatelessWidget {
                 decoration: const InputDecoration(
                   hintText: "Masukkan NIK",
                   isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+                  contentPadding:
+                      EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Nomor Telepon"),
+              const SizedBox(height: 10),
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  icon: Text("+62"),
+                  hintText: "8xxx",
+                  isDense: true,
+                  contentPadding:
+                      EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -160,7 +210,8 @@ class RegisterPage extends StatelessWidget {
                 decoration: const InputDecoration(
                   hintText: "Masukkan email",
                   isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+                  contentPadding:
+                      EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -178,7 +229,8 @@ class RegisterPage extends StatelessWidget {
                 decoration: const InputDecoration(
                   hintText: "Buat kata sandi",
                   isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+                  contentPadding:
+                      EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -187,9 +239,13 @@ class RegisterPage extends StatelessWidget {
           const SizedBox(height: 20),
           Obx(() {
             return TextButton(
-              onPressed: registerController.isLoading.value ? null : handleRegisterWithEmail,
+              onPressed: registerController.isLoading.value
+                  ? null
+                  : handleRegisterWithEmail,
               style: TextButton.styleFrom(
-                backgroundColor: registerController.isLoading.value ? Colors.grey : blueAccent,
+                backgroundColor: registerController.isLoading.value
+                    ? Colors.grey
+                    : blueAccent,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(5),
                 ),
@@ -233,7 +289,9 @@ class RegisterPage extends StatelessWidget {
           const SizedBox(height: 20),
           Obx(() {
             return TextButton(
-              onPressed: registerController.isLoading.value ? null : handleRegisterWithGoogle,
+              onPressed: registerController.isLoading.value
+                  ? null
+                  : handleRegisterWithGoogle,
               style: TextButton.styleFrom(
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(5),

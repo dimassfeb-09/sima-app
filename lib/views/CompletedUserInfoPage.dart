@@ -1,16 +1,14 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get_state_manager/get_state_manager.dart';
 import 'package:get/route_manager.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:project/models/Auth.dart';
 import 'package:project/utils/colors.dart';
-import 'package:project/views/HomePage.dart';
 import 'package:project/views/LoginPage.dart';
 import 'package:project/views/MainPage.dart';
 
-import '../models/User.dart' as usr;
 import '../components/Toast.dart';
 import '../controller/RegisterController.dart';
+import '../models/User.dart' as usr;
 
 class CompletedUserInfoPage extends StatefulWidget {
   const CompletedUserInfoPage({super.key});
@@ -25,6 +23,7 @@ class _CompletedUserInfoPageState extends State<CompletedUserInfoPage> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController nikController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
 
   @override
   void initState() {
@@ -46,8 +45,31 @@ class _CompletedUserInfoPageState extends State<CompletedUserInfoPage> {
   }
 
   bool validateRequiredFields() {
-    if (nameController.text.isEmpty || nikController.text.isEmpty) {
+    if (nameController.text.isEmpty ||
+        nikController.text.isEmpty ||
+        emailController.text.isEmpty ||
+        phoneController.text.isEmpty) {
       ToastUtils.showError("All fields are required");
+      return false;
+    }
+
+    if (nikController.text.length < 16) {
+      ToastUtils.showError("NIK minimal 16 digit.");
+      return false;
+    }
+
+    if (nikController.text.length > 16) {
+      ToastUtils.showError("NIK maksimal 16 digit.");
+      return false;
+    }
+
+    if (phoneController.text.length < 11) {
+      ToastUtils.showError("Nomor telepon minimum 11 digit.");
+      return false;
+    }
+
+    if (phoneController.text.length > 13) {
+      ToastUtils.showError("Nomor telepon maksimal 13 digit.");
       return false;
     }
     return true;
@@ -64,6 +86,7 @@ class _CompletedUserInfoPageState extends State<CompletedUserInfoPage> {
       final name = nameController.text;
       final nik = nikController.text;
       final email = emailController.text;
+      final phone = phoneController.text;
 
       // Check if the current user is null (not logged in)
       User? currentUser = _auth.currentUser;
@@ -74,18 +97,21 @@ class _CompletedUserInfoPageState extends State<CompletedUserInfoPage> {
           uid: currentUser.uid,
           fullName: name,
           email: email,
+          phone: phone,
           nik: nik,
         );
 
         if (updateSuccess) {
           ToastUtils.showSuccess('User info updated successfully.');
-          Get.offAll(() => MainPage()); // Redirect to the home page and clear the navigation stack
+          Get.offAll(() =>
+              MainPage()); // Redirect to the home page and clear the navigation stack
         } else {
           ToastUtils.showError('Failed to update user information.');
         }
       } else {
         ToastUtils.showError('No user is currently logged in.');
-        Get.offAll(() => const LoginPage()); // Redirect to the login page and clear the navigation stack
+        Get.offAll(() =>
+            const LoginPage()); // Redirect to the login page and clear the navigation stack
       }
     } catch (e) {
       print("ERROR: $e");
@@ -116,14 +142,39 @@ class _CompletedUserInfoPageState extends State<CompletedUserInfoPage> {
           const SizedBox(height: 20),
           buildTextField("Nama Lengkap", nameController, "Masukkan nama"),
           const SizedBox(height: 20),
-          buildTextField("Nomor Induk Penduduk (NIK)", nikController, "Masukkan NIK",
+          buildTextField(
+              "Nomor Induk Penduduk (NIK)", nikController, "Masukkan NIK",
               keyboardType: TextInputType.number),
+          const SizedBox(height: 20),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Nomor Telepon"),
+              const SizedBox(height: 10),
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  icon: Text("+62"),
+                  hintText: "8xxx",
+                  isDense: true,
+                  contentPadding:
+                      EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 20),
           Obx(() {
             return TextButton(
-              onPressed: registerController.isLoading.value ? null : handleCompleteUserInfo,
+              onPressed: registerController.isLoading.value
+                  ? null
+                  : handleCompleteUserInfo,
               style: TextButton.styleFrom(
-                backgroundColor: registerController.isLoading.value ? Colors.grey : blueAccent,
+                backgroundColor: registerController.isLoading.value
+                    ? Colors.grey
+                    : blueAccent,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(5),
                 ),
@@ -146,7 +197,8 @@ class _CompletedUserInfoPageState extends State<CompletedUserInfoPage> {
     );
   }
 
-  Widget buildTextField(String label, TextEditingController controller, String hintText,
+  Widget buildTextField(
+      String label, TextEditingController controller, String hintText,
       {bool enabled = true, TextInputType keyboardType = TextInputType.text}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -160,7 +212,8 @@ class _CompletedUserInfoPageState extends State<CompletedUserInfoPage> {
           decoration: InputDecoration(
             hintText: hintText,
             isDense: true,
-            contentPadding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+            contentPadding:
+                const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
             border: OutlineInputBorder(),
           ),
         ),

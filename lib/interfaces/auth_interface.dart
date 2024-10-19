@@ -10,6 +10,7 @@ abstract class AuthInterface {
     required String name,
     required String nik,
     required String email,
+    required String phone,
     required String password,
   });
 

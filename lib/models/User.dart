@@ -1,6 +1,4 @@
 import 'package:firebase_auth/firebase_auth.dart' as f_auth;
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
 import 'package:get/route_manager.dart';
 import 'package:project/components/Toast.dart';
 import 'package:project/models/Auth.dart';
@@ -73,13 +71,14 @@ class User {
 
     // Fetch the NIK from Supabase
     String? nik = await _getNikFromSupabase(currentUser.uid);
+    String? phone = await _getPhoneFromSupabase(currentUser.uid);
 
     var userDetail = UserDetail(
       uid: currentUser.uid,
       displayName: currentUser.displayName ?? '',
       email: currentUser.email ?? '',
       nik: nik,
-      phoneNumber: currentUser.phoneNumber ?? '',
+      phoneNumber: "+62$phone" ?? '',
       photoURL: currentUser.photoURL ?? '',
       isSignInWithGoogle: isGoogleSignIn,
     );
@@ -91,9 +90,23 @@ class User {
     final supabase = Supabase.instance.client;
 
     try {
-      final response = await supabase.from('users').select('nik').eq('uid', uid).single();
+      final response =
+          await supabase.from('users').select('nik').eq('uid', uid).single();
 
       return response['nik'] as String?;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<String?> _getPhoneFromSupabase(String uid) async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      final response =
+          await supabase.from('users').select('phone').eq('uid', uid).single();
+
+      return response['phone'] as String?;
     } catch (e) {
       return null;
     }
@@ -103,7 +116,8 @@ class User {
     final supabase = Supabase.instance.client;
 
     try {
-      final response = await supabase.from('users').select('id').eq('uid', uid).single();
+      final response =
+          await supabase.from('users').select('id').eq('uid', uid).single();
       return response['id'] as int?;
     } catch (e) {
       return null;
@@ -114,6 +128,7 @@ class User {
     required String uid,
     required String fullName,
     required String email,
+    required String phone,
     required String nik,
   }) async {
     final supabase = Supabase.instance.client;
@@ -124,6 +139,7 @@ class User {
         'full_name': fullName,
         'email': email,
         'nik': nik,
+        'phone': phone,
         'account_type': 'user',
       });
 
@@ -157,7 +173,8 @@ class User {
 
       await auth.sendPasswordResetEmail(email: email);
       Get.to(() => const PasswordResetSuccessPage());
-      ToastUtils.showSuccess("Password reset email sent. Please check your inbox.");
+      ToastUtils.showSuccess(
+          "Password reset email sent. Please check your inbox.");
     } catch (e) {
       ToastUtils.showError('Error sending password reset email: $e');
     }
@@ -179,7 +196,8 @@ class User {
         password: currentPassword,
       );
 
-      f_auth.UserCredential userCredential = await user.reauthenticateWithCredential(credential);
+      f_auth.UserCredential userCredential =
+          await user.reauthenticateWithCredential(credential);
 
       if (userCredential.user == null) {
         ToastUtils.showError('Failed to re-authenticate user.');
@@ -193,16 +211,19 @@ class User {
 
       if (authResult.isSuccess) {
         Get.offAll(() => const LoginPage());
-        ToastUtils.showSuccess("Email changed successfully. Please verify your new email.");
+        ToastUtils.showSuccess(
+            "Email changed successfully. Please verify your new email.");
       } else {
-        ToastUtils.showError(authResult.errorMessage ?? 'Unexpected error during sign out.');
+        ToastUtils.showError(
+            authResult.errorMessage ?? 'Unexpected error during sign out.');
       }
     } catch (e) {
       ToastUtils.showError('Unexpected error: $e');
     }
   }
 
-  Future<void> changePassword(String currentPassword, String newPassword) async {
+  Future<void> changePassword(
+      String currentPassword, String newPassword) async {
     try {
       f_auth.FirebaseAuth firebaseAuth = f_auth.FirebaseAuth.instance;
       f_auth.User? user = firebaseAuth.currentUser;
@@ -217,7 +238,8 @@ class User {
         password: currentPassword,
       );
 
-      f_auth.UserCredential userCredential = await user.reauthenticateWithCredential(credential);
+      f_auth.UserCredential userCredential =
+          await user.reauthenticateWithCredential(credential);
 
       if (userCredential.user == null) {
         ToastUtils.showError('Failed to re-authenticate user.');
@@ -231,16 +253,19 @@ class User {
 
       if (authResult.isSuccess) {
         Get.offAll(() => const LoginPage());
-        ToastUtils.showSuccess("Password changed successfully. Please log in again.");
+        ToastUtils.showSuccess(
+            "Password changed successfully. Please log in again.");
       } else {
-        ToastUtils.showError(authResult.errorMessage ?? 'Unexpected error during sign out.');
+        ToastUtils.showError(
+            authResult.errorMessage ?? 'Unexpected error during sign out.');
       }
     } catch (e) {
       ToastUtils.showError('Unexpected error: $e');
     }
   }
 
-  Future<void> changePhoneNumber(String newPhoneNumber, String currentPassword) async {
+  Future<void> changePhoneNumber(
+      String newPhoneNumber, String currentPassword) async {
     final f_auth.FirebaseAuth auth = f_auth.FirebaseAuth.instance;
 
     try {
@@ -251,79 +276,35 @@ class User {
         return;
       }
 
+      if (user.email == null) {
+        ToastUtils.showError('Current user has no email.');
+        return;
+      }
+
       f_auth.AuthCredential credential = f_auth.EmailAuthProvider.credential(
         email: user.email!,
         password: currentPassword,
       );
 
-      f_auth.UserCredential userCredential = await user.reauthenticateWithCredential(credential);
+      f_auth.UserCredential userCredential =
+          await user.reauthenticateWithCredential(credential);
 
       if (userCredential.user == null) {
         ToastUtils.showError('Failed to re-authenticate user.');
         return;
       }
 
-      await auth.verifyPhoneNumber(
-        phoneNumber: newPhoneNumber,
-        verificationCompleted: (PhoneAuthCredential credential) async {
-          await user.updatePhoneNumber(credential);
-          ToastUtils.showSuccess('Phone number updated successfully');
-        },
-        verificationFailed: (f_auth.FirebaseAuthException e) {
-          ToastUtils.showError('Phone number verification failed: ${e.message}');
-        },
-        codeSent: (String verificationId, int? resendToken) async {
-          _showCodeInputDialog(verificationId);
-        },
-        codeAutoRetrievalTimeout: (String verificationId) {
-          // Handle auto-retrieval timeout if needed
-        },
-      );
+      final supabase = Supabase.instance.client;
 
-      ToastUtils.showSuccess('Phone number change process started successfully');
+      await supabase.from('users').update({
+        'phone': newPhoneNumber,
+      }).eq('uid', user.uid);
+
+      ToastUtils.showSuccess('Phone number updated successfully in Supabase');
+      Get.back();
     } catch (e) {
-      ToastUtils.showError('Error changing phone number: $e');
+      print('Exception: $e');
+      ToastUtils.showError('An unexpected error occurred: $e');
     }
-  }
-
-  void _showCodeInputDialog(String verificationId) {
-    final TextEditingController codeController = TextEditingController();
-
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Enter SMS Code'),
-        content: TextField(
-          controller: codeController,
-          decoration: const InputDecoration(labelText: 'SMS Code'),
-          keyboardType: TextInputType.number,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              String smsCode = codeController.text;
-
-              // Create a PhoneAuthCredential with the code
-              PhoneAuthCredential credential = PhoneAuthProvider.credential(
-                verificationId: verificationId,
-                smsCode: smsCode,
-              );
-
-              try {
-                // Update the phone number with the credential
-                f_auth.User? user = f_auth.FirebaseAuth.instance.currentUser;
-                if (user != null) {
-                  await user.updatePhoneNumber(credential);
-                  ToastUtils.showSuccess("Phone number updated successfully.");
-                  Get.back(); // Close the dialog
-                }
-              } catch (e) {
-                ToastUtils.showError('Failed to verify code: $e');
-              }
-            },
-            child: const Text('Submit'),
-          ),
-        ],
-      ),
-    );
   }
 }
